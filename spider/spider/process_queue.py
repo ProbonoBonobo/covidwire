@@ -23,12 +23,11 @@ from bs4 import BeautifulSoup, element, UnicodeDammit
 import datetime
 from spider.utils import DotDict
 
-ENV = 'local'
 LIMIT = 200
 MAX_REQUESTS = 100
 
-conn = init_conn(ENV)
-db = init_db(ENV)
+conn = init_conn()
+db = init_db()
 NULL_DATE = datetime.datetime(1960, 1, 1)
 model = ClassificationModel('roberta', os.path.join(__file__, '../lib/classification_model/v1.0'))
 

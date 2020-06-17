@@ -4,16 +4,15 @@ import json
 from spider.async_utils import fetch_all_responses
 from spider.common import config, init_db, init_conn, create_sitemaps_table, create_spiderqueue_table, create_articles_table
 MAX_REQUESTS = 100
-ENV = "local"
 
-conn = init_conn(ENV)
-db = init_db(ENV)
+conn = init_conn()
+db = init_db()
 create_sitemaps_table()
 create_spiderqueue_table()
 create_articles_table()
 
 def main():
-    responsedb = db['responses']
+    responsedb = db['sitemaps']
     sitemaps = {datetime.datetime.now().strftime(row['url']): row for row in db['sitemaps']}
     for row in sitemaps.values():
         print(json.dumps(row, indent=4, default=str))

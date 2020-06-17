@@ -4,8 +4,7 @@ import psycopg2
 import os
 from collections import OrderedDict
 
-target = "local"
-# #
+target = "prod"
 config = {"local": {
     "user": "kz",
     "password": "admin",
@@ -31,11 +30,11 @@ config = {"local": {
 # Production DB
 
 
-def init_db(target):
+def init_db(target=target):
     db_config = config[target]
     return dataset.connect(f"postgresql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}")
 
-def init_conn(target):
+def init_conn(target=target):
     db_config = config[target]
     conn = psycopg2.connect(**db_config)
     return conn
@@ -68,9 +67,7 @@ def create_sitemaps_table():
         sql = """
     create table if not exists sitemaps
     (
-        url text not null
-            constraint responses_url_key
-                unique,
+        url text not null,
         resolved_url text not null,
         site text,
         name text,
@@ -104,9 +101,7 @@ def create_articles_table():
     conn = init_conn(target)
     sql = """create table articles
 (
-	id serial not null
-		constraint parsed_pkey
-			primary key,
+	id serial not null primary key,
 	url text,
 	published_at timestamp,
 	name text,

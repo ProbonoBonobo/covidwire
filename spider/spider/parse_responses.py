@@ -8,10 +8,9 @@ from bs4 import BeautifulSoup
 
 MAX_REQUESTS = 20
 MAX_ARTICLES_PER_SOURCE = 100
-ENV = "local"
 NULL_DATE = datetime.datetime(1960, 1, 1)
 
-db = init_db(ENV)
+db = init_db()
 
 seen = set()
 
@@ -72,11 +71,10 @@ def parse_sitemap(row):
 
 
 
-
-crawldb = db['moderationtable']
-responsedb = db['responses']
+crawldb = db['articles']
+responsedb = db['sitemaps']
 spiderqueue = db['spiderqueue']
-seen.update([row['article_url'] for row in crawldb], [row['url'] for row in spiderqueue])
+seen.update([row['url'] for row in crawldb])
 try:
     with open("seen.pkl", "rb") as f:
         bad_urls = pickle.load(f)
@@ -85,12 +83,12 @@ except:
     pass
 
 
-queue = [row for row in responsedb if row['is_sitemap']]
+queue = [row for row in responsedb]
 
 
 parsed = []
 for row in queue:
     parsed.extend(parse_sitemap(row))
-filtered = [row for row in parsed if row]
+filtered = [row for row in parsed if row and row['url'] not in seen]
 spiderqueue.upsert_many(filtered, ['url'])
 
