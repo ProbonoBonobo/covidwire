@@ -13,7 +13,7 @@ create_articles_table()
 
 def main():
     responsedb = db['sitemaps']
-    sitemaps = {datetime.datetime.now().strftime(row['url']): row for row in db['sitemaps']}
+    sitemaps = {datetime.datetime.now().strftime(row['url']): row for row in db['sitemapindex']}
     for row in sitemaps.values():
         print(json.dumps(row, indent=4, default=str))
     urls = list( sitemaps.keys())
