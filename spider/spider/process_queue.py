@@ -23,13 +23,13 @@ from bs4 import BeautifulSoup, element, UnicodeDammit
 import datetime
 from spider.utils import DotDict
 
-LIMIT = 200
+LIMIT = 2000
 MAX_REQUESTS = 100
 
 conn = init_conn()
 db = init_db()
 NULL_DATE = datetime.datetime(1960, 1, 1)
-model = ClassificationModel('roberta', os.path.join(__file__, '../lib/classification_model/v1.0'))
+model = ClassificationModel('roberta', '/root/covidwire/spider/lib/classification_model/v1.0', use_cuda=0)
 
 
 UniversalSelector = DotDict({
@@ -114,7 +114,7 @@ class Article:
             return txt
 
 
-table = db['parsed']
+table = db['articles']
 
 seen = set([row['url'] for row in table if row['mod_status'] is None])
 if True:

@@ -18,7 +18,7 @@ config = {"local": {
              "port": "5432",
              "database": "postgres"},
     "prod": {"user": "postgres",
-             "password": os.environ.get('MODERATION_PASSWORD', "Feigenbum4"),
+             "password": "Feigenbum4",
              "host": "35.188.134.37",
              "port": "5432",
              "database": "postgres"}}
