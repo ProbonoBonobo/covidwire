@@ -64,14 +64,17 @@ def extract_entities_with_allennlp(s):
 if __name__ == "__main__":
     updates = []
     print(f"Extracting entities..")
+    # ner model sometimes fails to recognize newlines as token span boundaries, which they almost always are. to mitigate this,
+    # we'll insert a sequence of null tokens between line starts and line ends
+    pad = "\n . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . \n"
     for row in [
         row
         for row in crawldb.find(ner=None, prediction="approved", _limit=LIMIT_ARTICLES)
     ]:
         print(f"Updating {row}")
-        content = "\n ".join(
+        content = pad.join(
             [
-                str(attr)
+                re.sub(r"(\s*\n+\s*)", pad, str(attr))
                 for attr in [
                     row["title"],
                     row["loc"],
