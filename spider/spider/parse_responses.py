@@ -14,6 +14,7 @@ db = init_db()
 
 seen = set()
 
+
 def ensure_tztime(ts):
     if isinstance(ts, str):
         ts = parse_timestamp(ts)
@@ -22,19 +23,20 @@ def ensure_tztime(ts):
     except:
         return ts
 
-def parse_sitemap(row):
-    if not row or not row['content']:
-        return []
-    sitemap_url = row['url']
 
-    soup = BeautifulSoup(row['content'], 'xml')
+def parse_sitemap(row):
+    if not row or not row["content"]:
+        return []
+    sitemap_url = row["url"]
+
+    soup = BeautifulSoup(row["content"], "xml")
     elements = soup.findAll("url")
     rows = []
     print(row.keys())
     for elem in elements:
         url_node = elem.find("loc")
         lastmod_node = elem.find("lastmod")
-        xmlmeta = '\n'.join([str(e) for e in elem.children]).encode('utf-8')
+        xmlmeta = "\n".join([str(e) for e in elem.children]).encode("utf-8")
 
         try:
             lastmod = parse_timestamp(lastmod_node.text.strip())
@@ -46,35 +48,38 @@ def parse_sitemap(row):
         except:
             continue
 
-
         if url:
             url = url.strip()
             if url in seen:
                 continue
 
-            row = {"url": url.strip(),
-                   "site": row['site'],
-                   "name": row['name'],
-                   "city": row['city'],
-                   "state": row['state'],
-                   "loc": row['loc'],
-                   "lastmod": lastmod,
-                   "xmlmeta": xmlmeta}
+            row = {
+                "url": url.strip(),
+                "site": row["site"],
+                "name": row["name"],
+                "city": row["city"],
+                "state": row["state"],
+                "loc": row["loc"],
+                "lastmod": lastmod,
+                "xmlmeta": xmlmeta,
+            }
             rows.append(row)
             seen.add(url.strip())
 
-
-
-    rows = list(sorted(rows, key=lambda row: ensure_tztime(['lastmod']), reverse=True))[:min(len(rows), MAX_ARTICLES_PER_SOURCE)]
-    print(magenta("[ fetch_sitemap ] "), f":: Extracted {len(rows)} urls from sitemap: {sitemap_url}")
+    rows = list(sorted(rows, key=lambda row: ensure_tztime(["lastmod"]), reverse=True))[
+        : min(len(rows), MAX_ARTICLES_PER_SOURCE)
+    ]
+    print(
+        magenta("[ fetch_sitemap ] "),
+        f":: Extracted {len(rows)} urls from sitemap: {sitemap_url}",
+    )
     return rows
 
 
-
-crawldb = db['articles']
-responsedb = db['sitemaps']
-spiderqueue = db['spiderqueue']
-seen.update([row['url'] for row in crawldb])
+crawldb = db["articles"]
+responsedb = db["sitemaps"]
+spiderqueue = db["spiderqueue"]
+seen.update([row["url"] for row in crawldb])
 try:
     with open("seen.pkl", "rb") as f:
         bad_urls = pickle.load(f)
@@ -89,6 +94,5 @@ queue = [row for row in responsedb]
 parsed = []
 for row in queue:
     parsed.extend(parse_sitemap(row))
-filtered = [row for row in parsed if row and row['url'] not in seen]
-spiderqueue.upsert_many(filtered, ['url'])
-
+filtered = [row for row in parsed if row and row["url"] not in seen]
+spiderqueue.upsert_many(filtered, ["url"])

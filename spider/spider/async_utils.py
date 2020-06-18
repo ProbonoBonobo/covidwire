@@ -6,6 +6,7 @@ from spider.common import default_headers
 
 async def fetch_responses(urls: List[str], number_workers: int):
     responses = {}
+
     async def token_issuer(token_sender: trio.abc.SendChannel, number_tokens: int):
         async with token_sender:
             for _ in range(number_tokens):
@@ -16,15 +17,16 @@ async def fetch_responses(urls: List[str], number_workers: int):
             for url in url_iterator:
                 await token_receiver.receive()
 
-                print(f'[{round(trio.current_time(), 2)}] Start loading link: {url}')
+                print(f"[{round(trio.current_time(), 2)}] Start loading link: {url}")
                 try:
                     async with httpx.AsyncClient() as client:
-                        response = await client.get(url, headers=default_headers, cookies={"ccpa-state": "No"})
+                        response = await client.get(
+                            url, headers=default_headers, cookies={"ccpa-state": "No"}
+                        )
                     responses[url] = response
                 except Exception as e:
                     response = f"[ fetch_urls ] No response from url {url}: {e.__class__.__name__} :: {e}"
                     responses[url] = response
-
 
     url_iterator = iter(urls)
     token_send_channel, token_receive_channel = trio.open_memory_channel(0)
