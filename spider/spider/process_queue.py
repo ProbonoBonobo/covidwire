@@ -55,7 +55,10 @@ class Article:
         self.url = url
         self.html = fix_text(html.replace("\xa0", " ")) if fix_encoding_errors else html
         self.soup = soup if soup else BeautifulSoup(self.html)
-        self.lxml = lxml if lxml else parse_html(self.html)
+        try:
+            self.lxml = lxml if lxml else parse_html(self.html)
+        except:
+            self.lxml = None
         self.data = {
             "content": self.content,
             "url": self.url,
@@ -71,6 +74,8 @@ class Article:
 
     @property
     def published_at(self):
+        if not self.lxml:
+            return NULL_DATE
         print(f"Guessing date for {self.url}...")
         guess = guess_date(url=self.url, html=self.html)
         date = guess.date or NULL_DATE
@@ -112,6 +117,8 @@ class Article:
 
     @property
     def title(self):
+        if not self.lxml:
+            return None
         for candidate in self.lxml.xpath(UniversalSelector.title):
             candidate = str(candidate)
             longest = list(sorted(re.split(r"\s[|-]\s", candidate), key=len))[-1]
@@ -120,6 +127,8 @@ class Article:
 
     @property
     def summary(self):
+        if not self.lxml:
+            return None
         for candidate in self.lxml.xpath(UniversalSelector.summary):
             txt = normalize(
                 "NFKD", fix_text(str(candidate).replace("\xa0", " "))
@@ -129,6 +138,8 @@ class Article:
 
     @property
     def author(self):
+        if not self.lxml:
+            return None
         for candidate in self.lxml.xpath(UniversalSelector.author):
             txt = normalize(
                 "NFKD", fix_text(str(candidate).replace("\xa0", " "))
