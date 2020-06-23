@@ -23,14 +23,18 @@ from bs4 import BeautifulSoup, element, UnicodeDammit
 import datetime
 from spider.utils import DotDict
 
-LIMIT = 2000
+audience_labels = ['international', 'city', 'regional', 'national', 'indefinite', 'state']
+LIMIT = 1000
 MAX_REQUESTS = 100
 
 conn = init_conn()
 db = init_db()
 NULL_DATE = datetime.datetime(1960, 1, 1)
-model = ClassificationModel(
-    "roberta", "/root/covidwire/spider/lib/classification_model/v1.0", use_cuda=0
+relevance_classifier = ClassificationModel(
+    "roberta", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib/classification_model/v1.0"), use_cuda=0
+)
+audience_classifier = ClassificationModel(
+    "roberta", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib/audience_classifier/v1.0"), num_labels=len(audience_labels), use_cuda=0
 )
 
 
@@ -55,10 +59,7 @@ class Article:
         self.url = url
         self.html = fix_text(html.replace("\xa0", " ")) if fix_encoding_errors else html
         self.soup = soup if soup else BeautifulSoup(self.html)
-        try:
-            self.lxml = lxml if lxml else parse_html(self.html)
-        except:
-            self.lxml = None
+        self.lxml = lxml if lxml else parse_html(self.html)
         self.data = {
             "content": self.content,
             "url": self.url,
@@ -74,8 +75,6 @@ class Article:
 
     @property
     def published_at(self):
-        if not self.lxml:
-            return NULL_DATE
         print(f"Guessing date for {self.url}...")
         guess = guess_date(url=self.url, html=self.html)
         date = guess.date or NULL_DATE
@@ -117,8 +116,6 @@ class Article:
 
     @property
     def title(self):
-        if not self.lxml:
-            return None
         for candidate in self.lxml.xpath(UniversalSelector.title):
             candidate = str(candidate)
             longest = list(sorted(re.split(r"\s[|-]\s", candidate), key=len))[-1]
@@ -127,8 +124,6 @@ class Article:
 
     @property
     def summary(self):
-        if not self.lxml:
-            return None
         for candidate in self.lxml.xpath(UniversalSelector.summary):
             txt = normalize(
                 "NFKD", fix_text(str(candidate).replace("\xa0", " "))
@@ -138,8 +133,6 @@ class Article:
 
     @property
     def author(self):
-        if not self.lxml:
-            return None
         for candidate in self.lxml.xpath(UniversalSelector.author):
             txt = normalize(
                 "NFKD", fix_text(str(candidate).replace("\xa0", " "))
@@ -179,8 +172,11 @@ if True:
             tokens = list([t.strip() for t in re.split(r"\s+", row["content"].lower())])
             truncated_preview = " ".join(tokens[: min(100, len(tokens))])
             model_input = [row["title"].lower(), truncated_preview]
-            prediction, out = model.predict([model_input])
+            prediction, out = relevance_classifier.predict([model_input])
             row["prediction"] = ["rejected", "approved"][prediction[0]]
+            prediction, out =  audience_classifier.predict([row['title']])
+            print(f"Audience prediction: {prediction} ({audience_labels[prediction[0]]})")
+            row['audience'] = audience_labels[prediction[0]]
             row["mod_status"] = (
                 "pending" if row["prediction"] == "approved" else "rejected"
             )
