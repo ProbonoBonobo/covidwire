@@ -10,6 +10,7 @@ from math import sqrt, log
 from textwrap import wrap
 from geopy.distance import geodesic
 import pandas as pd
+from geopy.distance import geodesic
 from urllib.request import urlopen
 import json
 import plotly.io as pio
@@ -22,7 +23,7 @@ import dataset
 import psycopg2
 import os
 
-GENERATE_PLOTS = False
+GENERATE_PLOTS = True
 
 # #
 db_config = {
@@ -192,7 +193,20 @@ blacklisted_ents = ("Wall St.", "Congress", 'The City')
 def diag2poly(p1, p2):
     points = Polygon([p1, [p1[0], p2[1]], p2, [p2[0], p1[1]]])
     return points
+
 @cache_queries
+def geocode(*args, **kwargs):
+    globals()['geocode'].__doc__ = gmaps.geocode.__doc__
+    result = gmaps.geocode(sourceloc)
+    return result
+
+@cache_queries
+def find_place(*args, **kwargs):
+    globals()['find_place'].__doc__ = gmaps.find_place.__doc__
+    result = gmaps.find_place(*args, **kwargs)
+    return result
+
+
 def get_bounding_box(s, poi=None):
     match_types = set()
     """
@@ -204,19 +218,17 @@ def get_bounding_box(s, poi=None):
     is_geo = len(qualnames) >= 10 or any(t in match_types for t in geotypes)
     """
 
-    @cache_queries
     def get_locationbias(sourceloc):
-        if sourceloc in bias and bias[sourceloc]:
-            return bias[sourceloc]
-        else:
-            response = gmaps.geocode(sourceloc)
-            lat, lon = list(response[0]['geometry']['location'].values())
-        querystring = f"circle:5000@{lat},{lon}"
+        response = geocode(sourceloc)
+        lat, lon = list(response[0]['geometry']['location'].values())
+        querystring = f"circle:50000@{lat},{lon}"
         bias[sourceloc] = querystring
         return querystring
+
     location_bias = get_locationbias(poi) if poi else None
-    response = gmaps.find_place(s, location_bias=location_bias, input_type='textquery',
-                                fields=['name', 'geometry', 'formatted_address'])
+    response = find_place(s, location_bias=location_bias, input_type='textquery', fields=['name', 'geometry', 'formatted_address'])
+    if poi and "California" not in poi:
+        response['candidates'] = [candidate for candidate in response['candidates'] if geodesic(my_loc, list(candidate['geometry']['location'].values())).km > 250]
     err = None
     try:
         candidate = response['candidates'][0]
@@ -226,7 +238,7 @@ def get_bounding_box(s, poi=None):
         diameter = geodesic(list(reversed(bb[1])), list(reversed(bb[0]))).kilometers / 2
 
         centroid = poly.centroid
-        bb = calculate_bounding_box(centroid.coords[0], diameter * 0.5)
+        bb = calculate_bounding_box(centroid.coords[0], diameter * 0.38)
         area = poly.area
         name = response['candidates'][0]['name']
     except Exception as e:
@@ -278,7 +290,8 @@ with conn.cursor() as curr:
 global_sos = np.mean(np.array(cumsums))
 
 batch = []
-queue = list(sorted([row for row in crawldb.find(scored=None, mod_status='pending', _limit=10)], key=lambda x: x['published_at'], reverse=True))
+queue = list(sorted([row for row in crawldb.find(scored=None, mod_status='pending')], key=lambda x: x['published_at'], reverse=True))
+my_loc = [32.74,-117.13]
 for row in queue:
     if not row['ner']:
         continue
@@ -312,21 +325,23 @@ for row in queue:
         for county, hull in counties.items():
             if hull.intersects(poly):
 
+                c1= list(sorted(list(*hull.centroid.coords),reverse=True))
+                c2 = list(sorted(list(*result.centroid.coords), reverse=True))
 
-                distance_from_target = 1 if hull.contains(poly) else pow(10, poly.distance(hull.centroid))
-                distance_from_source = origin.distance(hull)
-                distance_penalty = distance_from_target + distance_from_source
+                distance_from_target = 1 if hull.contains(poly) or poly.contains(hull)  else 1/sqrt((1+geodesic(c1, c2).km)/4)
+                #distance_from_source = origin.distance(hull)
+                distance_penalty = distance_from_target
 
                 size_penalty = pow(1+result.area,2)/6
                 unweighted_score = log(1+pow(1+weight, 2), 2)
-                relevance_score = sqrt(unweighted_score / distance_from_target / size_penalty) * difference_penalty
+                relevance_score = sqrt(unweighted_score / size_penalty) * distance_penalty * difference_penalty
                 resolved_names[county].append(f"{ent} ( => {result.name} )")
 
 
                 print(f"County {green(county)} intersects {blue(result.name)} with score: {magenta(relevance_score)}")
-                print(f"    relevance_score = sqrt(unweighted_score / distance_from_target / size_penalty) * distance_penalty")
-                print(red(f"    = sqrt({round(unweighted_score)} / {round(distance_penalty,8)} / {round(size_penalty,8)}) * {distance_penalty}") )
-                print(yellow(f"    = sqrt({round(unweighted_score/distance_penalty/size_penalty, 8)}) * {distance_penalty}") )
+                print(f"    relevance_score = sqrt(unweighted_score / size_penalty) * distance_penalty * difference_penalty")
+                print(red(f"    = sqrt({round(unweighted_score)} / {round(size_penalty,8)}) * {distance_penalty} * {difference_penalty}") )
+                print(yellow(f"    = sqrt({(unweighted_score/size_penalty) * distance_penalty } * {difference_penalty}") )
                 print(green(f"    = {relevance_score}"))
                 acc[county] += relevance_score
     acc = {k:v for k,v in acc.items()}
