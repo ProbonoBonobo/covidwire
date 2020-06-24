@@ -23,7 +23,7 @@ import dataset
 import psycopg2
 import os
 
-GENERATE_PLOTS = False
+GENERATE_PLOTS = True
 
 # #
 db_config = {
@@ -163,6 +163,7 @@ with urlopen('https://raw.githubusercontent.com/plotly/datasets/master/geojson-c
 crawldb = db['articles']
 shapedb = db['geojson']
 counties = {}
+states = {}
 county2fips = {}
 for row in shapedb:
     coords = eval(row['hull'].replace("{","[").replace("}", "]"))
@@ -288,6 +289,29 @@ with conn.cursor() as curr:
             cumsums.append(sos)
 
 global_sos = np.mean(np.array(cumsums))
+import shapely
+def load_geojson(feature):
+     t = feature['type']
+
+     coords = feature['coordinates']
+     print(t, coords)
+     constructor = getattr(shapely.geometry, t)
+     if t == 'MultiPolygon':
+         shape = constructor([shapely.geometry.Polygon(x) for x in coords])
+
+     else:
+         shape = constructor(coords[0])
+     return shape
+county_shapes = {}
+state_shapes = {}
+for i, row in enumerate(db['geojson_v4']):
+    cf = (red, yellow, green, blue, cyan, magenta)[i%6]
+    target = county_shapes if row['feature_type'] == 'County' else state_shapes
+
+    try:
+        target[row['qualname']] = load_geojson(row['geometry'])
+    except:
+        target[row['qualname']] = load_geojson(row['hull'])
 
 batch = []
 queue = list(sorted([row for row in crawldb.find(scored=None, mod_status='pending')], key=lambda x: x['published_at'], reverse=True))
@@ -321,9 +345,10 @@ for row in queue:
         if result.err:
             print(result.err)
             continue
-        poly = result.poly
+        poly = result.poly if ent not in state_shapes else state_shapes[ent]
         difference_penalty = pow(jaro_winkler.normalized_similarity(result.name, ent), 2)
         for county, hull in counties.items():
+
             if hull.intersects(poly):
 
                 c1= list(sorted(list(*hull.centroid.coords),reverse=True))
