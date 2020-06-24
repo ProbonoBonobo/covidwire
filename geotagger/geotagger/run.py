@@ -291,7 +291,8 @@ global_sos = np.mean(np.array(cumsums))
 
 batch = []
 queue = list(sorted([row for row in crawldb.find(scored=None, mod_status='pending')], key=lambda x: x['published_at'], reverse=True))
-my_loc = [32.74,-117.13]
+my_loc = [float(os.getenv("LAT", 32.74)),
+            float(os.getenv("LONG",-117.13))]
 for row in queue:
     if not row['ner']:
         continue
