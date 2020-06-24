@@ -23,7 +23,7 @@ import dataset
 import psycopg2
 import os
 
-GENERATE_PLOTS = True
+GENERATE_PLOTS = False
 
 # #
 db_config = {
@@ -340,8 +340,8 @@ for row in queue:
         origin = Point(origin_coords)
 
 
-        print(result)
-        print(result.response)
+        # print(result)
+        # print(result.response)
         if result.err:
             print(result.err)
             continue
@@ -363,12 +363,12 @@ for row in queue:
                 relevance_score = sqrt(unweighted_score / size_penalty) * distance_penalty * difference_penalty
                 resolved_names[county].append(f"{ent} ( => {result.name} )")
 
-
-                print(f"County {green(county)} intersects {blue(result.name)} with score: {magenta(relevance_score)}")
-                print(f"    relevance_score = sqrt(unweighted_score / size_penalty) * distance_penalty * difference_penalty")
-                print(red(f"    = sqrt({round(unweighted_score)} / {round(size_penalty,8)}) * {distance_penalty} * {difference_penalty}") )
-                print(yellow(f"    = sqrt({(unweighted_score/size_penalty) * distance_penalty } * {difference_penalty}") )
-                print(green(f"    = {relevance_score}"))
+                #
+                # print(f"County {green(county)} intersects {blue(result.name)} with score: {magenta(relevance_score)}")
+                # print(f"    relevance_score = sqrt(unweighted_score / size_penalty) * distance_penalty * difference_penalty")
+                # print(red(f"    = sqrt({round(unweighted_score)} / {round(size_penalty,8)}) * {distance_penalty} * {difference_penalty}") )
+                # print(yellow(f"    = sqrt({(unweighted_score/size_penalty) * distance_penalty } * {difference_penalty}") )
+                # print(green(f"    = {relevance_score}"))
                 acc[county] += relevance_score
     acc = {k:v for k,v in acc.items()}
     local_arr = np.array(list(acc.values()))
