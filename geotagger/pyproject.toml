@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "covidwire-geotagger"
+version = "0.1.0"
+description = ""
+authors = ["Kevin Zeidler <kzeidler@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+textdistance = "^4.1.0"
+shapely = "^1.7.0"
+munch = "^2.5.0"
+numpy = "^1.18.5"
+googlemaps = "^4.4.1"
+plotly = "^4.8.1"
+allennlp = "^1.0.0"
+allennlp-models = "^1.0.0"
+pyproj = "^2.6.1"
+pyxdameraulevenshtein = "^1.6"
+gemeinsprache = "^0.1.0"
+termcolor = "^1.1.0"
+geopy = "^1.22.0"
+pandas = "^1.0.5"
+dataset = "^1.3.1"
+psycopg2 = "^2.8.5"
+dill = "^0.3.2"
+rich = "^2.2.5"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
