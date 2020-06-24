@@ -1,4 +1,3 @@
-from rich import print
 from textdistance import JaroWinkler
 from shapely.geometry import Polygon, MultiPolygon, Point
 from munch import Munch
@@ -14,7 +13,6 @@ import pandas as pd
 from urllib.request import urlopen
 import json
 import plotly.io as pio
-pio.renderers.default = 'browser'
 from urllib.request import urlopen
 import json
 import plotly.io as pio
@@ -23,6 +21,8 @@ import re
 import dataset
 import psycopg2
 import os
+
+GENERATE_PLOTS = False
 
 # #
 db_config = {
@@ -170,7 +170,7 @@ for row in shapedb:
     counties[county] = hull
     county2fips[county] = row['fips']
 
-gmaps = googlemaps.Client(key='AIzaSyBgKU4uNBEw1pmNZ5Fv-Y06tpBqP5TpXpM')
+gmaps = googlemaps.Client(key=os.environ['GOOGLE_MAPS_API_KEY'])
 rows = []
 bias = {}
 
@@ -369,13 +369,14 @@ for row in queue:
     if len(batch) > 5:
         crawldb.update_many(batch, ['url'])
         batch = []
-    lng, lat = list(counties[ranked[0][0]].centroid.coords)[0]
-    center = {"lat": lat, "lon": lng}
-    struct = pd.DataFrame([{"county": k, "fips": county2fips[k], "z": v, "tokens": ', '.join([f"{x}<br>" for x in resolved_names[k]])} for k,v in acc.items()])
-    if max(struct.z) >= 0.2:
-        title = f"[#{row['id']}] {row['title']} ({row['name']}, {row['loc']})"
-        subtitle = {row['description']}
-        visualize(struct, title, subtitle, center, row['id'], chunked)
+    if GENERATE_PLOTS:
+        lng, lat = list(counties[ranked[0][0]].centroid.coords)[0]
+        center = {"lat": lat, "lon": lng}
+        struct = pd.DataFrame([{"county": k, "fips": county2fips[k], "z": v, "tokens": ', '.join([f"{x}<br>" for x in resolved_names[k]])} for k,v in acc.items()])
+        if max(struct.z) >= 0.2:
+            title = f"[#{row['id']}] {row['title']} ({row['name']}, {row['loc']})"
+            subtitle = {row['description']}
+            visualize(struct, title, subtitle, center, row['id'], chunked)
 
 
 
