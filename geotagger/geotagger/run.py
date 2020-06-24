@@ -23,7 +23,7 @@ import dataset
 import psycopg2
 import os
 
-GENERATE_PLOTS = True
+GENERATE_PLOTS = False
 
 # #
 db_config = {
