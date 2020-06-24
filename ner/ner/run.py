@@ -10,14 +10,13 @@ import re
 import json
 from gemeinsprache.utils import red, green, cyan, magenta, blue, yellow
 import torch
-LIMIT_ARTICLES = 100
+LIMIT_ARTICLES = 9999999
 
 db = init_db()
 crawldb = db["articles"]
 allennlp_model = None
 
 import allennlp_models.tagging
-
 
 
 def extract_entities_with_allennlp(*s):
@@ -30,8 +29,10 @@ def extract_entities_with_allennlp(*s):
             cuda_device = 0
         else:
             cuda_device = -1
-        allennlp_model = Predictor.from_path(model_url, cuda_device=cuda_device)
-        print(yellow(f"[ model_init ] "), f" :: CUDA initialized? ", [green("YES"), red("NO")][abs(cuda_device)])
+        allennlp_model = Predictor.from_path(model_url,
+                                             cuda_device=cuda_device)
+        print(yellow(f"[ model_init ] "), f" :: CUDA initialized? ",
+              [green("YES"), red("NO")][abs(cuda_device)])
         print(yellow(f"[ model_init ] "), f" :: Load complete.")
     print(yellow(f"[ model_predict ]"), f" :: Extracting entities...")
     start = datetime.datetime.now()
@@ -43,14 +44,15 @@ def extract_entities_with_allennlp(*s):
             part = f"{part} . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ."
         curr = []
         try:
-            print(yellow(f"[ model_predict ]"), " :: Next input:")
-            for line in textwrap.wrap(part):
-                print("                ", cyan(line))
+            # print(yellow(f"[ model_predict ]"), " :: Next input:")
+            # for line in textwrap.wrap(part):
+            #     print("                ", cyan(line))
 
             results = allennlp_model.predict(sentence=part)
-            print(yellow(f"[ model_predict ]"), green(" :: OK"))
+            # print(yellow(f"[ model_predict ]"), green(" :: OK"))
         except Exception as e:
-            print(yellow(f"[ model_predict ]"), red(" :: {e.__class__.__name__}! :: {e}"))
+            print(yellow(f"[ model_predict ]"),
+                  red(f" :: {e.__class__.__name__}! :: {e}"))
             continue
         for word, tag in zip(results["words"], results["tags"]):
             if not re.search(r"(LOC)", tag):
@@ -84,7 +86,10 @@ def extract_entities_with_allennlp(*s):
         cased[ent.lower()].append(ent)
     for k, v in cased.items():
         cased[k] = list(sorted(v, key=lambda x: v.count(x)))
-    freqs = {v[-1]: len(v) for v in sorted(list(cased.values()), key=len, reverse=True)}
+    freqs = {
+        v[-1]: len(v)
+        for v in sorted(list(cased.values()), key=len, reverse=True)
+    }
     print(blue("Extracted entities:"))
     print(cyan(json.dumps(freqs, indent=4)))
     return freqs
@@ -97,8 +102,8 @@ if __name__ == "__main__":
     # we'll insert a sequence of null tokens between line starts and line ends
     pad = "\n . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . \n"
     for row in [
-        row
-        for row in crawldb.find(ner=None, prediction="approved", _limit=LIMIT_ARTICLES)
+            row for row in crawldb.find(
+                ner=None, prediction="approved", _limit=LIMIT_ARTICLES)
     ]:
         print(f"Updating {row}")
         # content = pad.join(
@@ -114,7 +119,16 @@ if __name__ == "__main__":
         #         if attr
         #     ]
         # )
-        counts = extract_entities_with_allennlp(row['title'], row['loc'], row['state'], row['description'], *row['content'].split("\n"))
-        updates.append({"url": row["url"], "ner": counts})
-
-    crawldb.update_many(updates, ["url"])
+        counts = extract_entities_with_allennlp(row['title'],
+                                                row['description'],
+                                                *row['content'].split("\n"))
+        updates.append({"id": row["id"], "ner": counts})
+        print(
+            magenta(
+                f"Processing complete. ( {len(updates)} / 50 ) rows queued for insertion."
+            ))
+        if len(updates) > 50:
+            print(f"Inserting 50 rows...")
+            crawldb.update_many(updates, ["id"])
+            updates = []
+    crawldb.update_many(updates, ['id'])

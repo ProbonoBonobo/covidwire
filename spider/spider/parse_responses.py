@@ -66,9 +66,9 @@ def parse_sitemap(row):
             rows.append(row)
             seen.add(url.strip())
 
-    rows = list(sorted(rows, key=lambda row: ensure_tztime(["lastmod"]), reverse=True))[
-        : min(len(rows), MAX_ARTICLES_PER_SOURCE)
-    ]
+    rows = list(
+        sorted(rows, key=lambda row: ensure_tztime(["lastmod"]),
+               reverse=True))[:min(len(rows), MAX_ARTICLES_PER_SOURCE)]
     print(
         magenta("[ fetch_sitemap ] "),
         f":: Extracted {len(rows)} urls from sitemap: {sitemap_url}",
@@ -87,9 +87,7 @@ try:
 except:
     pass
 
-
 queue = [row for row in responsedb]
-
 
 parsed = []
 for row in queue:

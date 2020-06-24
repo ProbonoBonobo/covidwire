@@ -37,13 +37,14 @@ local_db = dataset.connect(
     f"postgresql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}"
 )
 
-
 #Production DB
-db_config = {"user": "postgres",
-             "password": os.environ.get('MODERATION_PASSWORD', "Feigenbum4"),
-             "host": "35.188.134.37",
-             "port": "5432",
-             "database": "postgres"}
+db_config = {
+    "user": "postgres",
+    "password": os.environ.get('MODERATION_PASSWORD', "Feigenbum4"),
+    "host": "35.188.134.37",
+    "port": "5432",
+    "database": "postgres"
+}
 
 db = dataset.connect(
     f"postgresql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}"
@@ -58,7 +59,6 @@ from gemeinsprache.utils import blue, green, cyan, yellow, magenta
 
 nlp = None
 allennlp_model = None
-
 
 
 def deg2dec(coord):
@@ -86,13 +86,8 @@ def blake(thing):
     """Calculate a blake2b hash value for any valid object. If `thing` isn't a string, check to see if it has a __dict__
        representation that could be hashed instead (so different references to the same value will hash to the same
        value); otherwise, use its __repr__() value as a fallback."""
-    thingstring = (
-        thing
-        if isinstance(thing, str)
-        else repr(thing.__dict__)
-        if hasattr(thing, "__dict__")
-        else repr(thing)
-    )
+    thingstring = (thing if isinstance(thing, str) else repr(thing.__dict__)
+                   if hasattr(thing, "__dict__") else repr(thing))
     return blake2b(thingstring.encode("utf-8")).hexdigest()
 
 
@@ -118,7 +113,10 @@ def serialize_call_args(f):
 
     return wrapped
 
+
 import dill
+
+
 def cache_queries(func):
     sym = func.__name__
 
@@ -155,8 +153,9 @@ def cache_queries(func):
     return wrapped
 
 
-
-with urlopen('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json') as response:
+with urlopen(
+        'https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json'
+) as response:
     plotly_data = json.load(response)
 # API_KEY = os.environ['GOOGLE_MAPS_API_KEY']
 
@@ -166,7 +165,7 @@ counties = {}
 states = {}
 county2fips = {}
 for row in shapedb:
-    coords = eval(row['hull'].replace("{","[").replace("}", "]"))
+    coords = eval(row['hull'].replace("{", "[").replace("}", "]"))
     county = row['name']
     hull = Polygon(coords)
     counties[county] = hull
@@ -182,11 +181,20 @@ from pyproj import Geod
 def calculate_bounding_box(point, km):
     lon, lat = point
     geod = Geod(ellps="WGS84")
-    ne1, ne2, az1 = geod.fwd(lon, lat, az=45, dist=km / 2 * 1000, radians=False)
-    sw1, se2, az2 = geod.fwd(lon, lat, az=az1, dist=km / 2 * 1000, radians=False)
+    ne1, ne2, az1 = geod.fwd(lon,
+                             lat,
+                             az=45,
+                             dist=km / 2 * 1000,
+                             radians=False)
+    sw1, se2, az2 = geod.fwd(lon,
+                             lat,
+                             az=az1,
+                             dist=km / 2 * 1000,
+                             radians=False)
     c1 = (ne1, ne2)
     c2 = (sw1, se2)
     return c1, c2
+
 
 blacklisted_ents = ("Wall St.", "Congress", 'The City')
 
@@ -195,11 +203,13 @@ def diag2poly(p1, p2):
     points = Polygon([p1, [p1[0], p2[1]], p2, [p2[0], p1[1]]])
     return points
 
+
 @cache_queries
 def geocode(*args, **kwargs):
     globals()['geocode'].__doc__ = gmaps.geocode.__doc__
     result = gmaps.geocode(sourceloc)
     return result
+
 
 @cache_queries
 def find_place(*args, **kwargs):
@@ -218,7 +228,6 @@ def get_bounding_box(s, poi=None):
     geotypes = ("Settlement", "District", "Community", "Neighborhood", "City", "Capitol", "State", "Country", "Valley", "Mountain")
     is_geo = len(qualnames) >= 10 or any(t in match_types for t in geotypes)
     """
-
     def get_locationbias(sourceloc):
         response = geocode(sourceloc)
         lat, lon = list(response[0]['geometry']['location'].values())
@@ -227,16 +236,27 @@ def get_bounding_box(s, poi=None):
         return querystring
 
     location_bias = get_locationbias(poi) if poi else None
-    response = find_place(s, location_bias=location_bias, input_type='textquery', fields=['name', 'geometry', 'formatted_address'])
+    response = find_place(s,
+                          location_bias=location_bias,
+                          input_type='textquery',
+                          fields=['name', 'geometry', 'formatted_address'])
     if poi and "California" not in poi:
-        response['candidates'] = [candidate for candidate in response['candidates'] if geodesic(my_loc, list(candidate['geometry']['location'].values())).km > 250]
+        response['candidates'] = [
+            candidate for candidate in response['candidates']
+            if geodesic(my_loc, list(candidate['geometry']
+                                     ['location'].values())).km > 250
+        ]
     err = None
     try:
         candidate = response['candidates'][0]
-        bb = [list(sorted(list(p.values()))) for p in candidate['geometry']['viewport'].values()]
+        bb = [
+            list(sorted(list(p.values())))
+            for p in candidate['geometry']['viewport'].values()
+        ]
         coords = diag2poly(*bb)
         poly = Polygon(coords)
-        diameter = geodesic(list(reversed(bb[1])), list(reversed(bb[0]))).kilometers / 2
+        diameter = geodesic(list(reversed(bb[1])), list(reversed(
+            bb[0]))).kilometers / 2
 
         centroid = poly.centroid
         bb = calculate_bounding_box(centroid.coords[0], diameter * 0.38)
@@ -251,32 +271,54 @@ def get_bounding_box(s, poi=None):
         area = poly.area
         err = e
         name = None
-    return {"bias": location_bias, "response": response, "name": name,  "bounds": bb, "poly": poly, "centroid": centroid, "area": area, "err": err}
+    return {
+        "bias": location_bias,
+        "response": response,
+        "name": name,
+        "bounds": bb,
+        "poly": poly,
+        "centroid": centroid,
+        "area": area,
+        "err": err
+    }
+
 
 def visualize(df, title, subtitle, center, article_id, content):
     import plotly.express as px
     mapbox_access_token = "pk.eyJ1IjoibmVvbmNvbnRyYWlscyIsImEiOiJjazhzazZxNmQwaG4xM2xtenB2YmZiaDQ5In0.CJhvMwotvbdJX4FhbyFCxA"
     import plotly.graph_objects as go
 
-    fig = go.Figure(go.Choroplethmapbox(geojson=plotly_data,  locations=df.fips, z=df.z, name='county',
-
-                                         hoverinfo='all', text=[f"County: {county} <br>Tokens: {x} <br>Score: {score}" for x, score, county in zip(df.tokens, df.z, df.county)],
-                                        marker_line_width=0,   marker_opacity=[max(z/max(df.z),0.1) for z in df.z],
-                                        zmin=0, zmax=max(6, max(df.z)),
-
-
-
-
-                               ))
-    fig.update_layout(mapbox_style="dark", mapbox_accesstoken=mapbox_access_token, title=title,
-                      paper_bgcolor='darkgray', plot_bgcolor='darkgray',
-                      mapbox_zoom=8, mapbox_center=center)
+    fig = go.Figure(
+        go.Choroplethmapbox(
+            geojson=plotly_data,
+            locations=df.fips,
+            z=df.z,
+            name='county',
+            hoverinfo='all',
+            text=[
+                f"County: {county} <br>Tokens: {x} <br>Score: {score}"
+                for x, score, county in zip(df.tokens, df.z, df.county)
+            ],
+            marker_line_width=0,
+            marker_opacity=[max(z / max(df.z), 0.1) for z in df.z],
+            zmin=0,
+            zmax=max(6, max(df.z)),
+        ))
+    fig.update_layout(mapbox_style="dark",
+                      mapbox_accesstoken=mapbox_access_token,
+                      title=title,
+                      paper_bgcolor='darkgray',
+                      plot_bgcolor='darkgray',
+                      mapbox_zoom=8,
+                      mapbox_center=center)
     fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
     fig.show()
     # os.makedirs(f"outputs/{article_id}", exist_ok=True)
     # with open(f"outputs/{article_id}/content.txt", "w") as f:
     #     f.write(content)
     # fig.write_html(f"outputs/{article_id}/fig.html")
+
+
 #
 jaro_winkler = JaroWinkler()
 cumsums = []
@@ -285,27 +327,31 @@ with conn.cursor() as curr:
     for row in curr.fetchall():
         if row[0]:
             arr = np.array(list(row[0].values()))
-            sos = (arr ** 2).sum()
+            sos = (arr**2).sum()
             cumsums.append(sos)
 
 global_sos = np.mean(np.array(cumsums))
 import shapely
+
+
 def load_geojson(feature):
-     t = feature['type']
+    t = feature['type']
 
-     coords = feature['coordinates']
-     print(t, coords)
-     constructor = getattr(shapely.geometry, t)
-     if t == 'MultiPolygon':
-         shape = constructor([shapely.geometry.Polygon(x) for x in coords])
+    coords = feature['coordinates']
+    print(t, coords)
+    constructor = getattr(shapely.geometry, t)
+    if t == 'MultiPolygon':
+        shape = constructor([shapely.geometry.Polygon(x) for x in coords])
 
-     else:
-         shape = constructor(coords[0])
-     return shape
+    else:
+        shape = constructor(coords[0])
+    return shape
+
+
 county_shapes = {}
 state_shapes = {}
 for i, row in enumerate(db['geojson_v4']):
-    cf = (red, yellow, green, blue, cyan, magenta)[i%6]
+    cf = (red, yellow, green, blue, cyan, magenta)[i % 6]
     target = county_shapes if row['feature_type'] == 'County' else state_shapes
 
     try:
@@ -314,9 +360,11 @@ for i, row in enumerate(db['geojson_v4']):
         target[row['qualname']] = load_geojson(row['hull'])
 
 batch = []
-queue = list(sorted([row for row in crawldb.find(scored=None, mod_status='pending')], key=lambda x: x['published_at'], reverse=True))
-my_loc = [float(os.getenv("LAT", 32.74)),
-            float(os.getenv("LONG",-117.13))]
+queue = list(
+    sorted([row for row in crawldb.find(scored=None, mod_status='pending')],
+           key=lambda x: x['published_at'],
+           reverse=True))
+my_loc = [float(os.getenv("LAT", 32.74)), float(os.getenv("LONG", -117.13))]
 for row in queue:
     if not row['ner']:
         continue
@@ -336,9 +384,10 @@ for row in queue:
         result = Munch(get_bounding_box(ent, sourceloc))
         location_bias = result.bias
         print(f"Location bias: {location_bias}")
-        origin_coords = [float(x) for x in location_bias.split("@")[-1].split(",")]
+        origin_coords = [
+            float(x) for x in location_bias.split("@")[-1].split(",")
+        ]
         origin = Point(origin_coords)
-
 
         # print(result)
         # print(result.response)
@@ -346,21 +395,26 @@ for row in queue:
             print(result.err)
             continue
         poly = result.poly if ent not in state_shapes else state_shapes[ent]
-        difference_penalty = pow(jaro_winkler.normalized_similarity(result.name, ent), 2)
+        difference_penalty = pow(
+            jaro_winkler.normalized_similarity(result.name, ent), 2)
         for county, hull in counties.items():
 
             if hull.intersects(poly):
 
-                c1= list(sorted(list(*hull.centroid.coords),reverse=True))
+                c1 = list(sorted(list(*hull.centroid.coords), reverse=True))
                 c2 = list(sorted(list(*result.centroid.coords), reverse=True))
 
-                distance_from_target = 1 if hull.contains(poly) or poly.contains(hull)  else 1/sqrt((1+geodesic(c1, c2).km)/4)
+                distance_from_target = 1 if hull.contains(
+                    poly) or poly.contains(hull) else 1 / sqrt(
+                        (1 + geodesic(c1, c2).km) / 4)
                 #distance_from_source = origin.distance(hull)
                 distance_penalty = distance_from_target
 
-                size_penalty = pow(1+result.area,2)/6
-                unweighted_score = log(1+pow(1+weight, 2), 2)
-                relevance_score = sqrt(unweighted_score / size_penalty) * distance_penalty * difference_penalty
+                size_penalty = pow(1 + result.area, 2) / 6
+                unweighted_score = log(1 + pow(1 + weight, 2), 2)
+                relevance_score = sqrt(
+                    unweighted_score /
+                    size_penalty) * distance_penalty * difference_penalty
                 resolved_names[county].append(f"{ent} ( => {result.name} )")
 
                 #
@@ -370,13 +424,13 @@ for row in queue:
                 # print(yellow(f"    = sqrt({(unweighted_score/size_penalty) * distance_penalty } * {difference_penalty}") )
                 # print(green(f"    = {relevance_score}"))
                 acc[county] += relevance_score
-    acc = {k:v for k,v in acc.items()}
+    acc = {k: v for k, v in acc.items()}
     local_arr = np.array(list(acc.values()))
     if local_arr.max() >= 36:
-        scalar_coeff = 36/local_arr.max()
+        scalar_coeff = 36 / local_arr.max()
         local_arr = local_arr * scalar_coeff
         acc = dict(zip(acc.keys(), local_arr))
-    local_sos = (local_arr ** 2).sum()
+    local_sos = (local_arr**2).sum()
     # if local_sos > global_sos:
     #     scalar_ratio = local_sos / global_sos
     #     print(cyan(f"Rescaling by constant factor of {scalar_ratio} (global mean: {global_sos}; local mean: {local_sos})"))
@@ -386,19 +440,29 @@ for row in queue:
     # cumsums.append(local_sos)
     # global_sos = np.array(cumsums).mean()
 
-
     print(f"=================== Total scores: ====================")
-    print("                 ", cyan(row['title']), f" ({row['name']}, {row['loc']})")
+    print("                 ", cyan(row['title']),
+          f" ({row['name']}, {row['loc']})")
     print("                 ", blue(row['description']))
 
     for line in wrap(row['content']):
         print(yellow(line), )
     ranked = list(sorted(list(acc.items()), key=lambda x: x[1], reverse=True))
-    for county, score in sorted(list(acc.items()), key=lambda x: x[1], reverse=True):
+    for county, score in sorted(list(acc.items()),
+                                key=lambda x: x[1],
+                                reverse=True):
         if score >= 0.2:
 
-            print(f"{green(county):<36} :: {blue(score)} {magenta(resolved_names[county])}")
-    _row = dict({"ner": ents, "scored": {county2fips[k]: v for k,v in acc.items()}, 'url': row['url']}, **row)
+            print(
+                f"{green(county):<36} :: {blue(score)} {magenta(resolved_names[county])}"
+            )
+    _row = dict(
+        {
+            "ner": ents,
+            "scored": {county2fips[k]: v
+                       for k, v in acc.items()},
+            'url': row['url']
+        }, **row)
     from dataset.types import JSON
     batch.append(_row)
     # for k,v in list(globals().items()):
@@ -413,14 +477,17 @@ for row in queue:
     if GENERATE_PLOTS:
         lng, lat = list(counties[ranked[0][0]].centroid.coords)[0]
         center = {"lat": lat, "lon": lng}
-        struct = pd.DataFrame([{"county": k, "fips": county2fips[k], "z": v, "tokens": ', '.join([f"{x}<br>" for x in resolved_names[k]])} for k,v in acc.items()])
+        struct = pd.DataFrame([{
+            "county":
+            k,
+            "fips":
+            county2fips[k],
+            "z":
+            v,
+            "tokens":
+            ', '.join([f"{x}<br>" for x in resolved_names[k]])
+        } for k, v in acc.items()])
         if max(struct.z) >= 0.2:
             title = f"[#{row['id']}] {row['title']} ({row['name']}, {row['loc']})"
             subtitle = {row['description']}
             visualize(struct, title, subtitle, center, row['id'], chunked)
-
-
-
-
-
-
