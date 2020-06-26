@@ -2,6 +2,7 @@ import random
 import datetime
 import json
 from spider.async_utils import fetch_all_responses
+from gemeinsprache.utils import *
 from spider.common import (
     config,
     init_db,
@@ -11,7 +12,7 @@ from spider.common import (
     create_articles_table,
 )
 
-MAX_REQUESTS = 100
+MAX_REQUESTS = 10
 
 conn = init_conn()
 db = init_db()
@@ -33,7 +34,6 @@ def main():
     responses = []
     for url, result in results.items():
         row = sitemaps[url]
-        row["url"] = url
         if result:
             try:
                 row["resolved_url"] = url
@@ -66,7 +66,9 @@ def main():
 
         responses.append(row)
         print(row)
-
+    for response in responses:
+        for k,v in response.items():
+            print(blue(k), green(v))
     responsedb.upsert_many(responses, ["url"], ensure=True)
 
 
