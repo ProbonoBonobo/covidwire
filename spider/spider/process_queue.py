@@ -18,7 +18,7 @@ import re
 from simpletransformers.classification import ClassificationModel
 import os
 import json
-from ftfy import fix_text
+from ftfy import fix_text, fix_text_segment
 import random
 from bs4 import BeautifulSoup, element, UnicodeDammit
 import datetime
@@ -32,7 +32,7 @@ audience_labels = [
     "indefinite",
     "state",
 ]
-LIMIT = 500
+LIMIT = 1000
 MAX_REQUESTS = 10
 
 
@@ -86,7 +86,7 @@ class Article:
     def __init__(self, url, html, row, soup=None, lxml=None, fix_encoding_errors=True):
         self.url = url
         self.sitemap_data = row
-        self.html = fix_text(html.replace("\xa0", " ")) if fix_encoding_errors else html
+        self.html = fix_text_segment(html.replace("\xa0", " "), uncurl_quotes=False) if fix_encoding_errors else html
         self.soup = soup if soup else BeautifulSoup(self.html)
         self.meta = Haystack(self.soup)
         print(json.dumps(self.meta, indent=4))
@@ -259,6 +259,9 @@ if __name__ == "__main__":
     for url, res in responses.items():
         row = rows[url]
         if isinstance(res, str):
+            row['ok']=False
+            articles.append(row)
+
             continue
         html = res.decoded
         article = Article(url, html, row)

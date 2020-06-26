@@ -56,15 +56,14 @@ async def fetch_responses(urls: List[str], number_workers: int):
                             "content-encoding" in response.headers
                             and response.headers["content-encoding"] == "br"
                         ):
-                            response.decoded = fix_text_segment(
-                                brotli.decompress(response.content).decode(
+                            try:
+                                response.decoded = brotli.decompress(response.content).decode(
                                     response.encoding
                                 )
-                            )
+                            except Exception as e:
+                                response.decoded = response.content.decode(response.encoding)
                         else:
-                            response.decoded = fix_text_segment(
-                                response.content.decode(response.encoding)
-                            )
+                            response.decoded = response.content.decode(response.encoding)
                     responses[url] = response
                 except Exception as e:
                     response = f"[ fetch_urls ] No response from url {url}: {e.__class__.__name__} :: {e}"
