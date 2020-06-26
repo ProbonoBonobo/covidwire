@@ -66,9 +66,9 @@ def parse_sitemap(row):
             rows.append(row)
             seen.add(url.strip())
 
-    rows = list(
-        sorted(rows, key=lambda row: ensure_tztime(["lastmod"]),
-               reverse=True))[:min(len(rows), MAX_ARTICLES_PER_SOURCE)]
+    rows = list(sorted(rows, key=lambda row: ensure_tztime(["lastmod"]), reverse=True))[
+        : min(len(rows), MAX_ARTICLES_PER_SOURCE)
+    ]
     print(
         magenta("[ fetch_sitemap ] "),
         f":: Extracted {len(rows)} urls from sitemap: {sitemap_url}",
@@ -76,21 +76,22 @@ def parse_sitemap(row):
     return rows
 
 
-crawldb = db["articles"]
-responsedb = db["sitemaps"]
-spiderqueue = db["spiderqueue"]
-seen.update([row["url"] for row in crawldb])
-try:
-    with open("seen.pkl", "rb") as f:
-        bad_urls = pickle.load(f)
-        seen.update(bad_urls)
-except:
-    pass
+if __name__ == "__main__":
+    crawldb = db["articles"]
+    responsedb = db["sitemaps"]
+    spiderqueue = db["spiderqueue"]
+    seen.update([row["url"] for row in crawldb])
+    try:
+        with open("seen.pkl", "rb") as f:
+            bad_urls = pickle.load(f)
+            seen.update(bad_urls)
+    except:
+        pass
 
-queue = [row for row in responsedb]
+    queue = [row for row in responsedb]
 
-parsed = []
-for row in queue:
-    parsed.extend(parse_sitemap(row))
-filtered = [row for row in parsed if row and row["url"] not in seen]
-spiderqueue.upsert_many(filtered, ["url"])
+    parsed = []
+    for row in queue:
+        parsed.extend(parse_sitemap(row))
+    filtered = [row for row in parsed if row and row["url"] not in seen]
+    crawldb.upsert_many(filtered, ["url"])

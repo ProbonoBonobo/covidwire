@@ -23,8 +23,7 @@ create_articles_table()
 def main():
     responsedb = db["sitemaps"]
     sitemaps = {
-        datetime.datetime.now().strftime(row["url"]): row
-        for row in db["sitemapindex"]
+        datetime.datetime.now().strftime(row["url"]): row for row in db["sitemapindex"]
     }
     for row in sitemaps.values():
         print(json.dumps(row, indent=4, default=str))
@@ -55,7 +54,9 @@ def main():
                 row["created_at"] = datetime.datetime.now()
                 row["encoding"] = "utf-8"
                 row["status_code"] = 0
-                row["status_msg"] = f"{e.__class__.__name__} :: Response timed out. Error message: {e}"
+                row[
+                    "status_msg"
+                ] = f"{e.__class__.__name__} :: Response timed out. Error message: {e}"
                 row["is_sitemap"] = True
                 row["is_content"] = False
                 row["bytes"] = 0
