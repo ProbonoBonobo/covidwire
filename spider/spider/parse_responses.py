@@ -80,13 +80,8 @@ if __name__ == "__main__":
     crawldb = db["articles"]
     responsedb = db["sitemaps"]
     spiderqueue = db["spiderqueue"]
-    seen.update([row["url"] for row in crawldb])
-    try:
-        with open("seen.pkl", "rb") as f:
-            bad_urls = pickle.load(f)
-            seen.update(bad_urls)
-    except:
-        pass
+    seen.update([row["url"] for row in spiderqueue])
+
 
     queue = [row for row in responsedb]
 

@@ -6,7 +6,7 @@ import time
 import typing
 import os
 from collections import defaultdict
-
+import lxml
 import json
 import subprocess
 from date_guesser import guess_date
@@ -264,7 +264,10 @@ if __name__ == "__main__":
 
             continue
         html = res.decoded
-        article = Article(url, html, row)
+        try:
+            article = Article(url, html, row)
+        except lxml.etree.ParserError as e:
+            continue
         row = article.data
         # print(json.dumps(row, indent=4, default=lambda x: str(x) if isinstance(x, datetime.datetime) else x))
         if not all(k in row and row[k] for k in ("content", "title")):
