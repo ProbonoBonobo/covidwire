@@ -61,7 +61,7 @@ def extract_entities_with_allennlp(*s):
         for word, tag in zip(results["words"], results["tags"]):
             if not re.search(r"(LOC)", tag):
                 continue
-            elif word.startswith("'"):
+            elif word.startswith("'") and curr:
                 curr[-1] += word
             else:
                 curr.append(word)
@@ -104,10 +104,11 @@ if __name__ == "__main__":
     # ner model sometimes fails to recognize newlines as token span boundaries, which they almost always are. to mitigate this,
     # we'll insert a sequence of null tokens between line starts and line ends
     pad = "\n . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . \n"
-    for row in [
-        row
-        for row in crawldb.find(ner=None, prediction="approved", _limit=LIMIT_ARTICLES)
-    ]:
+    queue = list(sorted(list(crawldb.find(prediction="approved", ner=None)), key=lambda x: x['published_at']))
+    print(f"Queued {len(queue)} articles")
+    for row in queue:
+        if row['ner']:
+            continue
         print(f"Updating {row}")
         # content = pad.join(
         #     [
@@ -122,8 +123,11 @@ if __name__ == "__main__":
         #         if attr
         #     ]
         # )
+        summary = row['description'] if row['description'] else ''
+        title = row['title'] if row['title'] else ''
+        content = row['content'] if row['content'] else ''
         counts = extract_entities_with_allennlp(
-            row["title"], row["description"], *row["content"].split("\n")
+            title, summary, *content.split("\n")
         )
         updates.append({"id": row["id"], "ner": counts})
         print(
