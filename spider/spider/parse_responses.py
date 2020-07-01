@@ -62,6 +62,7 @@ def parse_sitemap(row):
                 "loc": row["loc"],
                 "lastmod": lastmod,
                 "xmlmeta": xmlmeta,
+                "is_dumpsterfire": row['is_dumpsterfire']
             }
             rows.append(row)
             seen.add(url.strip())
