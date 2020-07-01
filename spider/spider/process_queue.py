@@ -5,6 +5,7 @@ from psycopg2.extras import RealDictCursor
 import time
 import typing
 import os
+import sys
 from collections import defaultdict
 import lxml
 import json
@@ -233,58 +234,86 @@ class Article:
                 return url
         return result
 
+
 def insert_if(cond, tab, rows):
     err = None
     msg = None
-    if not cond:
-        return None, None
-    print(cyan(f"[ process_queue ] :: Inserting {len(rows)} articles to table {table}..."))
-    try:
-        tab.upsert_many(rows, ["url"])
-        articles = []
-        for article in articles:
-            print(green(f"[ process_queue ] :: Inserted {article['url']}"))
-        msg = cyan(f"[ process_queue ] :: Inserted {len(rows)} to table {table}.")
-    except Exception as e:
-        err = e
-        msg = red(f"[ process_queue ] :: FAILED TO INSERT {len(rows)} TO TABLE {table}!")
-    print(msg)
-    return err, msg
+    successes = 0
+    bad_rows = []
+    if cond:
+        print(cyan(f"[ process_queue ] :: Inserting {len(rows)} articles to table {table.name}..."))
+        try:
+            tab.upsert_many(rows, ["url"])
+            successes = len(rows)
+            for article in rows:
+                print(green(f"[ process_queue ] :: Inserted {article['url']} to table {table.name}"))
+        except Exception as batch_insert_error:
+            for article in rows:
+                try:
+                    tab.upsert(article, ['url'])
+                    print(green(f"[ process_queue ] :: Inserted {article['url']} to table {table.name}"))
+                    successes += 1
+                except Exception as row_insert_error:
+                    print(red(f"[ process_queue ] :: FAILED TO INSERT URL {article['url']} TO TABLE {table.name}"))
+                    bad_rows.append((row_insert_error, article))
+                    if not err:
+                        err = batch_insert_error
+        if bad_rows:
+            msg = red(f"[ process_queue ] :: ENCOUNTERED {len(bad_rows)} FAILURES ({successes} SUCCESSES) WHILE UPDATING TABLE {table.name}!")
+        else:
+            msg = cyan(f"[ process_queue ] :: Inserted {successes} rows to table {table.name}.")
+        rows = []
+        print(msg)
+    return err, msg, rows, bad_rows
 
-print(cyan(f"[ process_queue ] :: Inserting {len(articles)} articles..."))
-            try:
-                table.upsert_many(articles, ["url"])
-                articles = []
-                for article in articles:
-                    print(green(f"[ process_queue ] :: Inserted {article['url']}"))
-            except Exception as e:
-                print(f"no insert : {e.__class__.__name__} :: {e}")
-                continue
+
 
 if __name__ == "__main__":
     conn = init_conn()
     db = init_db()
     table = db["articles"]
     dumpsterfire = db['dumpsterfire']
+    candidate_articles = []
+    quarantined_articles = []
+
+    def process_buffers_when(cond, tolerate_errors=False):
+        global candidate_articles
+        global quarantined_articles
+        if not cond:
+            return
+        candidate_insertion_error, candidate_insertion_msg, candidate_articles, candidate_problem_rows = insert_if(len(candidate_articles), table, candidate_articles)
+        poop_insertion_error, poop_insertion_msg, quarantined_articles, heinous_poop = insert_if(len(quarantined_articles), dumpsterfire, quarantined_articles)
+        for batch_error, bad_rows in zip([candidate_insertion_error, poop_insertion_error],
+                                    [candidate_problem_rows, heinous_poop]):
+            if batch_error:
+                for row_error, row in bad_rows:
+                    print(red(row))
+                    print(red(f"{row_error.__class__.__name__} :: {row_error}"))
+            if not tolerate_errors:
+                assert not batch_error, f"{len(bad_rows)} rows could not be inserted."
+
 
     passthrough_attrs = ("url", "city", "state", "loc", "site", "name")
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(f"""
-            SELECT *
-            FROM   spiderqueue q
-            WHERE  NOT EXISTS (
-                SELECT  -- SELECT list mostly irrelevant; can just be empty in Postgres
-                FROM   articles a
-                WHERE  a.url = q.url
-         ) ORDER BY lastmod desc limit {LIMIT};
+            SELECT distinct on (url) *
+            FROM spiderqueue maybe_new
+            WHERE NOT EXISTS (
+                SELECT legit_article.url  
+                FROM   articles legit_article
+                WHERE  maybe_new.url = legit_article.url)
+            AND NOT EXISTS (
+                SELECT shitty_article.url
+                FROM dumpsterfire shitty_article 
+                WHERE maybe_new.url = shitty_article.url)
+            LIMIT {LIMIT}
     """)
         rows = {row["url"]: row for row in cur.fetchall()}
-    print(green("[ process_queue ] :: Added {len(rows)} urls to the queue."))
+    print(green(f"[ process_queue ] :: Added {len(rows)} urls to the queue."))
     urls = list(rows.keys())[0 : min(LIMIT, len(list(rows.keys())))]
     urls = random.sample(urls, k=len(urls))
     responses = fetch_all_responses(urls, MAX_REQUESTS)
-    candidate_articles = []
-    quarantined_articles = []
+
     for url, res in responses.items():
         row = rows[url]
         is_dumpsterfire = row['is_dumpsterfire']
@@ -345,9 +374,5 @@ if __name__ == "__main__":
             target_buffer.append(row)
         except Exception as e:
             print(e.__class__.__name__, e)
-
-        insert_if(len(candidate_articles) > 50, table, candidate_articles)
-        insert_if(len(quarantined_articles) > 50, dumpsterfire, quarantined_articles)
-    insert_if(len(candidate_articles), table, candidate_articles)
-    insert_if(len(quarantined_articles), dumpsterfire, quarantined_articles)
-
+        process_buffers_when(len(candidate_articles) > 50 or len(quarantined_articles) > 50)
+    process_buffers_when(True)
