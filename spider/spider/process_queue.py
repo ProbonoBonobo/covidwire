@@ -233,11 +233,39 @@ class Article:
                 return url
         return result
 
+def insert_if(cond, tab, rows):
+    err = None
+    msg = None
+    if not cond:
+        return None, None
+    print(cyan(f"[ process_queue ] :: Inserting {len(rows)} articles to table {table}..."))
+    try:
+        tab.upsert_many(rows, ["url"])
+        articles = []
+        for article in articles:
+            print(green(f"[ process_queue ] :: Inserted {article['url']}"))
+        msg = cyan(f"[ process_queue ] :: Inserted {len(rows)} to table {table}.")
+    except Exception as e:
+        err = e
+        msg = red(f"[ process_queue ] :: FAILED TO INSERT {len(rows)} TO TABLE {table}!")
+    print(msg)
+    return err, msg
+
+print(cyan(f"[ process_queue ] :: Inserting {len(articles)} articles..."))
+            try:
+                table.upsert_many(articles, ["url"])
+                articles = []
+                for article in articles:
+                    print(green(f"[ process_queue ] :: Inserted {article['url']}"))
+            except Exception as e:
+                print(f"no insert : {e.__class__.__name__} :: {e}")
+                continue
 
 if __name__ == "__main__":
     conn = init_conn()
     db = init_db()
     table = db["articles"]
+    dumpsterfire = db['dumpsterfire']
 
     passthrough_attrs = ("url", "city", "state", "loc", "site", "name")
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -255,12 +283,15 @@ if __name__ == "__main__":
     urls = list(rows.keys())[0 : min(LIMIT, len(list(rows.keys())))]
     urls = random.sample(urls, k=len(urls))
     responses = fetch_all_responses(urls, MAX_REQUESTS)
-    articles = []
+    candidate_articles = []
+    quarantined_articles = []
     for url, res in responses.items():
         row = rows[url]
+        is_dumpsterfire = row['is_dumpsterfire']
+        target_buffer = quarantined_articles if is_dumpsterfire else candidate_articles
         if isinstance(res, str):
             row['ok']=False
-            articles.append(row)
+            target_buffer.append(row)
 
             continue
         html = res.decoded
@@ -272,7 +303,7 @@ if __name__ == "__main__":
         # print(json.dumps(row, indent=4, default=lambda x: str(x) if isinstance(x, datetime.datetime) else x))
         if not all(k in row and row[k] for k in ("content", "title")):
             row["ok"] = False
-            articles.append(row)
+            target_buffer.append(row)
             continue
 
         try:
@@ -311,22 +342,12 @@ if __name__ == "__main__":
             print(
                 f"PREDICTION: {red(row['prediction'].upper()) if row['prediction'] == 'rejected' else green(row['prediction'].upper())}"
             )
-            articles.append(row)
+            target_buffer.append(row)
         except Exception as e:
             print(e.__class__.__name__, e)
 
-        if len(articles) > 50:
-            print(cyan(f"[ process_queue ] :: Inserting {len(articles)} articles..."))
-            try:
-                table.upsert_many(articles, ["url"])
-                articles = []
-                for article in articles:
-                    print(green(f"[ process_queue ] :: Inserted {article['url']}"))
-            except Exception as e:
-                print(f"no insert : {e.__class__.__name__} :: {e}")
-                continue
-    if articles:
-        print(cyan(f"[ process_queue ] :: Inserting {len(articles)} articles..."))
-        table.upsert_many(articles, ["url"])
-        for article in articles:
-            print(green(f"[ process_queue ] :: Inserted {article['url']}"))
+        insert_if(len(candidate_articles) > 50, table, candidate_articles)
+        insert_if(len(quarantined_articles) > 50, dumpsterfire, quarantined_articles)
+    insert_if(len(candidate_articles), table, candidate_articles)
+    insert_if(len(quarantined_articles), dumpsterfire, quarantined_articles)
+
