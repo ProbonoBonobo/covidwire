@@ -91,7 +91,10 @@ class Article:
         self.soup = soup if soup else BeautifulSoup(self.html)
         self.meta = Haystack(self.soup)
         print(json.dumps(self.meta, indent=4))
-        self.lxml = lxml if lxml else parse_html(self.html)
+        try:
+            self.lxml = lxml if lxml else parse_html(self.html)
+        except Exception as e:
+            raise ValueError(f"{e.__class__.__name__} :: {e}, {self.html}")
         self.data = {
             "content": self.content,
             "url": self.url,
@@ -328,7 +331,10 @@ if __name__ == "__main__":
         html = res.decoded
         try:
             article = Article(url, html, row)
-        except lxml.etree.ParserError as e:
+        except ValueError as e:
+            row['ok'] = False
+            print(red(e))
+            target_buffer.append(row)
             continue
         row = article.data
         # print(json.dumps(row, indent=4, default=lambda x: str(x) if isinstance(x, datetime.datetime) else x))
