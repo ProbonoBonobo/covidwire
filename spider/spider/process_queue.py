@@ -296,20 +296,22 @@ if __name__ == "__main__":
     passthrough_attrs = ("url", "city", "state", "loc", "site", "name")
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(f"""
-            SELECT distinct on (url) *
-            FROM spiderqueue maybe_new
-            WHERE NOT EXISTS (
-                SELECT legit_article.url  
-                FROM   articles legit_article
-                WHERE  maybe_new.url = legit_article.url)
-            AND NOT EXISTS (
-                SELECT shitty_article.url
-                FROM dumpsterfire shitty_article 
-                WHERE maybe_new.url = shitty_article.url)
-            LIMIT {LIMIT}
+            SELECT *
+            FROM   spiderqueue q
+            WHERE not EXISTS (
+                SELECT  -- SELECT list mostly irrelevant; can just be empty in Postgres
+                FROM   articles a
+                WHERE  a.url = q.url
+         ) and not EXISTS (
+                SELECT  -- SELECT list mostly irrelevant; can just be empty in Postgres
+                FROM   dumpsterfire a
+                WHERE  a.url = q.url
+         ) ORDER BY lastmod desc limit {LIMIT};
+
+
     """)
         rows = {row["url"]: row for row in cur.fetchall()}
-    print(green(f"[ process_queue ] :: Added {len(rows)} urls to the queue."))
+    print(green(f"[ process_queue ] :: Added {len(list(rows.keys()))} urls to the queue."))
     urls = list(rows.keys())[0 : min(LIMIT, len(list(rows.keys())))]
     urls = random.sample(urls, k=len(urls))
     responses = fetch_all_responses(urls, MAX_REQUESTS)

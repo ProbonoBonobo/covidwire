@@ -81,7 +81,9 @@ if __name__ == "__main__":
     crawldb = db["articles"]
     responsedb = db["sitemaps"]
     spiderqueue = db["spiderqueue"]
-    seen.update([row["url"] for row in spiderqueue])
+    dumpsterfire = db['dumpsterfire']
+    seen.update([row["url"] for row in crawldb])
+    seen.update([row['url'] for row in dumpsterfire])
 
 
     queue = [row for row in responsedb]
