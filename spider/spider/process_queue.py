@@ -33,7 +33,7 @@ audience_labels = [
     "indefinite",
     "state",
 ]
-LIMIT = 1000
+LIMIT = 100
 MAX_REQUESTS = 10
 
 
@@ -238,36 +238,7 @@ class Article:
         return result
 
 
-def insert_if(cond, tab, rows):
-    err = None
-    msg = None
-    successes = 0
-    bad_rows = []
-    if cond:
-        print(cyan(f"[ process_queue ] :: Inserting {len(rows)} articles to table {table.name}..."))
-        try:
-            tab.upsert_many(rows, ["url"])
-            successes = len(rows)
-            for article in rows:
-                print(green(f"[ process_queue ] :: Inserted {article['url']} to table {table.name}"))
-        except Exception as batch_insert_error:
-            for article in rows:
-                try:
-                    tab.upsert(article, ['url'])
-                    print(green(f"[ process_queue ] :: Inserted {article['url']} to table {table.name}"))
-                    successes += 1
-                except Exception as row_insert_error:
-                    print(red(f"[ process_queue ] :: FAILED TO INSERT URL {article['url']} TO TABLE {table.name}"))
-                    bad_rows.append((row_insert_error, article))
-                    if not err:
-                        err = batch_insert_error
-        if bad_rows:
-            msg = red(f"[ process_queue ] :: ENCOUNTERED {len(bad_rows)} FAILURES ({successes} SUCCESSES) WHILE UPDATING TABLE {table.name}!")
-        else:
-            msg = cyan(f"[ process_queue ] :: Inserted {successes} rows to table {table.name}.")
-        rows = []
-        print(msg)
-    return err, msg, rows, bad_rows
+
 
 
 
@@ -301,7 +272,7 @@ if __name__ == "__main__":
         cur.execute(f"""
             SELECT *
             FROM   spiderqueue q
-            WHERE not EXISTS (
+            not EXISTS (
                 SELECT  -- SELECT list mostly irrelevant; can just be empty in Postgres
                 FROM   articles a
                 WHERE  a.url = q.url
@@ -379,8 +350,12 @@ if __name__ == "__main__":
             print(
                 f"PREDICTION: {red(row['prediction'].upper()) if row['prediction'] == 'rejected' else green(row['prediction'].upper())}"
             )
-            target_buffer.append(row)
+            if is_dumpsterfire:
+                dumpsterfire.upsert(row, ['url'])
+            else:
+                table.upsert(row, ['url'])
         except Exception as e:
-            print(e.__class__.__name__, e)
-        process_buffers_when(len(candidate_articles) > 50 or len(quarantined_articles) > 50)
-    process_buffers_when(True)
+            print(red(f"ERROR: {e.__class__.__name__} :: {e}", row))
+            continue
+
+

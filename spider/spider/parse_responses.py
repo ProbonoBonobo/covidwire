@@ -82,8 +82,8 @@ if __name__ == "__main__":
     responsedb = db["sitemaps"]
     spiderqueue = db["spiderqueue"]
     dumpsterfire = db['dumpsterfire']
-    seen.update([row["url"] for row in crawldb])
-    seen.update([row['url'] for row in dumpsterfire])
+    seen.update([row["url"] for row in spiderqueue])
+    # seen.update([row['url'] for row in dumpsterfire])
 
 
     queue = [row for row in responsedb]
@@ -91,5 +91,8 @@ if __name__ == "__main__":
     parsed = []
     for row in queue:
         parsed.extend(parse_sitemap(row))
-    filtered = [row for row in parsed if row and row["url"] not in seen]
-    crawldb.upsert_many(filtered, ["url"])
+    filtered = [row for row in parsed if row['url'] not in seen]
+    for row in filtered:
+        spiderqueue.insert(row, ['url'])
+        print(f"Inserted {row['url']}")
+
