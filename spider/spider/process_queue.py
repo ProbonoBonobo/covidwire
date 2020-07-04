@@ -272,7 +272,7 @@ if __name__ == "__main__":
         cur.execute(f"""
             SELECT *
             FROM   spiderqueue q
-            not EXISTS (
+            WHERE not EXISTS (
                 SELECT  -- SELECT list mostly irrelevant; can just be empty in Postgres
                 FROM   articles a
                 WHERE  a.url = q.url
