@@ -33,7 +33,7 @@ audience_labels = [
     "indefinite",
     "state",
 ]
-LIMIT = 100
+LIMIT = 1000
 MAX_REQUESTS = 10
 
 
