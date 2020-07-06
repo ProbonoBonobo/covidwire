@@ -88,7 +88,11 @@ class Article:
         self.url = url
         self.sitemap_data = row
         self.html = fix_text_segment(html.replace("\xa0", " "), uncurl_quotes=False) if fix_encoding_errors else html
-        self.soup = soup if soup else BeautifulSoup(self.html)
+        try:
+
+            self.soup = soup if soup else BeautifulSoup(self.html, features='lxml')
+        except Exception as e:
+            raise ValueError(f"{e.__class__.__name__} :: {e}, {self.html}")
         self.meta = Haystack(self.soup)
         print(json.dumps(self.meta, indent=4))
         try:
@@ -278,8 +282,8 @@ if __name__ == "__main__":
                 WHERE  a.url = q.url
          ) and not EXISTS (
                 SELECT  -- SELECT list mostly irrelevant; can just be empty in Postgres
-                FROM   dumpsterfire a
-                WHERE  a.url = q.url
+                FROM   dumpsterfire b
+                WHERE  b.url = q.url
          ) ORDER BY lastmod desc limit {LIMIT};
 
 
@@ -304,6 +308,7 @@ if __name__ == "__main__":
             article = Article(url, html, row)
         except ValueError as e:
             row['ok'] = False
+            row['error_msg'] = str(e)
             print(red(e))
             target_buffer.append(row)
             continue
