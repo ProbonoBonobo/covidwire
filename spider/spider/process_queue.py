@@ -23,7 +23,7 @@ audience_labels = [
     "indefinite",
     "state",
 ]
-LIMIT = 50
+LIMIT = os.getenv('SPIDER_LIMIT', 500)
 MAX_REQUESTS = 10
 
 
