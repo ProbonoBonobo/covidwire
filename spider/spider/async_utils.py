@@ -48,22 +48,26 @@ async def fetch_responses(urls: List[str], number_workers: int):
                                 "OptanonGlobal": f"isIABGlobal=false&datestamp={optanon_timestamp}+GMT-0700+(Pacific+Daylight+Time)&version=5.15.0&landingPath=NotLandingPage&groups=C0003%3A1%2CC0004%3A1%2CC0005%3A1%2CBG50%3A1%2CC0002%3A1%2CC0001%3A1&hosts=xvr%3A1%2CH35%3A1%2Cxik%3A1%2Cudm%3A1%2Cots%3A1%2CH99%3A1%2Cyla%3A1%2Cixz%3A1%2Cziw%3A1%2CH253%3A1%2Cmwk%3A1%2Czci%3A1%2Cjjk%3A1%2Ceuw%3A1%2Cdwu%3A1%2Ceyl%3A1%2CH28%3A1%2Cbup%3A1%2Cdce%3A1%2CH30%3A1%2Coom%3A1%2Copx%3A1%2CH151%3A1%2Cpjw%3A1%2Cgzg%3A1%2Cywk%3A1%2Cdnm%3A1%2Cwjk%3A1%2Cuuk%3A1%2Cudt%3A1%2Czgf%3A1%2Cayv%3A1%2Crai%3A1%2Cktz%3A1%2Cdfh%3A1%2Clck%3A1%2CH117%3A1%2Chty%3A1%2Cszd%3A1%2Cbax%3A1%2Cymj%3A1%2Cjjg%3A1%2Chbz%3A1%2Cdui%3A1%2Cstj%3A1%2Cyqw%3A1%2Cddu%3A1%2Ccnt%3A1%2CH59%3A1%2Cyze%3A1%2CH80%3A1%2Ctif%3A1%2Cdvt%3A1%2Csjs%3A1%2Cviv%3A1%2Catx%3A1%2CH212%3A1%2Caiy%3A1%2Cqsc%3A1%2Cbro%3A1%2Capv%3A1%2Cvhh%3A1%2Cslt%3A1%2Cmlc%3A1%2Czsx%3A1%2CH155%3A1%2Cqih%3A1%2CH122%3A1%2CH32%3A1%2Cwjk%3A1%2Caso%3A1%2Cvpf%3A1%2Cbhq%3A1%2Cvrh%3A1%2CH37%3A1%2Cuuk%3A1%2Cwtu%3A1%2Chiz%3A1%2CH65%3A1%2CH68%3A1%2Czsx%3A1&legInt=&AwaitingReconsent=false",
                             }
                         )
-
-                        response = await client.get(
-                            url, headers=default_headers, cookies=default_cookies
-                        )
-                        if (
-                            "content-encoding" in response.headers
-                            and response.headers["content-encoding"] == "br"
-                        ):
-                            try:
-                                response.decoded = brotli.decompress(response.content).decode(
-                                    response.encoding
-                                )
-                            except Exception as e:
+                        try:
+                            response = await client.get(
+                                url, headers=default_headers, cookies=default_cookies, timeout=5
+                            )
+                            if (
+                                    "content-encoding" in response.headers
+                                    and response.headers["content-encoding"] == "br"
+                            ):
+                                try:
+                                    response.decoded = brotli.decompress(response.content).decode(
+                                        response.encoding
+                                    )
+                                except Exception as e:
+                                    response.decoded = response.content.decode(response.encoding)
+                            else:
                                 response.decoded = response.content.decode(response.encoding)
-                        else:
-                            response.decoded = response.content.decode(response.encoding)
+                        except Exception as e:
+                            response = f"{e.__class__.__name__} :: {e}"
+
+
                     responses[url] = response
                 except Exception as e:
                     response = f"[ fetch_urls ] No response from url {url}: {e.__class__.__name__} :: {e}"

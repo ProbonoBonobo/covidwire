@@ -80,7 +80,7 @@ class Article:
         self.html = fix_text_segment(html.replace("\xa0", " "), uncurl_quotes=False) if fix_encoding_errors else html
         try:
 
-            self.soup = soup if soup else BeautifulSoup(self.html, features='lxml')
+            self.soup = soup if soup else BeautifulSoup(self.html)
         except Exception as e:
             raise ValueError(f"{e.__class__.__name__} :: {e}, {self.html}")
         self.meta = Haystack(self.soup)

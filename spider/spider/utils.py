@@ -41,12 +41,14 @@ def load_metadata(soup):
         if isinstance(_o, list):
             for __o in _o:
                 o[__o["@type"]] = __o
-        elif isinstance(_o["@type"], list):
+        elif '@type' in _o and isinstance(_o["@type"], list):
             for t in _o["@type"]:
                 for __o in _o:
                     o[t] = __o
-        else:
+        elif '@type' in _o and _o['@type'] in o:
             o[_o["@type"]] = _o
+        else:
+            continue
 
     flat = FlatterDict(o)
     o = {}
