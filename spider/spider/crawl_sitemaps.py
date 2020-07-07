@@ -12,7 +12,7 @@ from spider.common import (
     create_articles_table,
 )
 
-MAX_REQUESTS = 10
+MAX_REQUESTS = 3
 
 conn = init_conn()
 db = init_db()

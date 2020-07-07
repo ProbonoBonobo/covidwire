@@ -24,7 +24,7 @@ audience_labels = [
     "state",
 ]
 LIMIT = os.getenv('SPIDER_LIMIT', 500)
-MAX_REQUESTS = 10
+MAX_REQUESTS = os.getenv('MAX_REQUESTS', 5)
 
 
 NULL_DATE = datetime.datetime(1960, 1, 1)

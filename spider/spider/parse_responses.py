@@ -7,8 +7,8 @@ from dateutil.parser import parse as parse_timestamp
 import pytz
 from bs4 import BeautifulSoup
 
-MAX_REQUESTS = 20
-MAX_ARTICLES_PER_SOURCE = 100
+MAX_REQUESTS = 10
+MAX_ARTICLES_PER_SOURCE = 250
 NULL_DATE = datetime.datetime(1960, 1, 1)
 
 db = init_db()
