@@ -148,6 +148,8 @@ class Article:
     def content(self):
         txt = []
         nodes = self.soup.select(UniversalSelector.content)
+        if not list(nodes):
+            nodes = self.soup.select("p")
         for node in nodes:
             if (
                 node
@@ -160,6 +162,7 @@ class Article:
                         "NFKD", fix_text(node.string.replace("\xa0", " "))
                     ).strip()
                 )
+
         body = "\n".join(txt)
         return body
 
