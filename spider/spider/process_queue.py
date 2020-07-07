@@ -1,17 +1,7 @@
-from spider.common import init_db, init_conn
+from spider.common import init_db
 from spider.async_utils import fetch_all_responses
-from gemeinsprache.utils import green, blue, cyan, yellow, red, magenta
-from psycopg2.extras import RealDictCursor
-import time
-import typing
-import os
-import sys
-from collections import defaultdict
-import lxml
-import json
-import subprocess
+from gemeinsprache.utils import green, cyan, yellow, red, magenta, blue, grey
 from date_guesser import guess_date
-from enum import Enum
 from dateutil.parser import parse as parse_timestamp
 from unicodedata import normalize
 from lxml.html import fromstring as parse_html
@@ -20,11 +10,11 @@ from simpletransformers.classification import ClassificationModel
 import os
 import json
 from ftfy import fix_text, fix_text_segment
-import random
-from bs4 import BeautifulSoup, element, UnicodeDammit
+from bs4 import BeautifulSoup
 import datetime
 from spider.utils import DotDict, Haystack
-
+import torch
+from scipy.spatial.distance import cosine
 audience_labels = [
     "international",
     "city",
@@ -33,7 +23,7 @@ audience_labels = [
     "indefinite",
     "state",
 ]
-LIMIT = 1000
+LIMIT = 50
 MAX_REQUESTS = 10
 
 
@@ -44,7 +34,7 @@ relevance_classifier = ClassificationModel(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "lib/classification_model/v1.0",
     ),
-    use_cuda=0,
+    use_cuda=int(torch.cuda.is_available()),
 )
 audience_classifier = ClassificationModel(
     "roberta",
@@ -53,7 +43,7 @@ audience_classifier = ClassificationModel(
         "lib/audience_classifier/v1.0",
     ),
     num_labels=len(audience_labels),
-    use_cuda=0,
+    use_cuda=int(torch.cuda.is_available())
 )
 
 UniversalSelector = DotDict(
@@ -94,8 +84,10 @@ class Article:
         except Exception as e:
             raise ValueError(f"{e.__class__.__name__} :: {e}, {self.html}")
         self.meta = Haystack(self.soup)
-        print(json.dumps(self.meta, indent=4))
+        # print(json.dumps(self.meta, indent=4))
         try:
+            if isinstance(self.html, str):
+                self.html = self.html.encode('utf-8')
             self.lxml = lxml if lxml else parse_html(self.html)
         except Exception as e:
             raise ValueError(f"{e.__class__.__name__} :: {e}, {self.html}")
@@ -239,68 +231,59 @@ class Article:
             if isinstance(candidate, str):
                 url = candidate.strip()
                 return url
-        return result
+            return result
 
 
 
 
-
-
+print(f"Initializing db...")
+db = init_db()
+print("initialized.")
 if __name__ == "__main__":
-    conn = init_conn()
-    db = init_db()
+    url2tensor = {}
+
+    spiderqueue = db['spiderqueue']
     table = db["articles"]
     dumpsterfire = db['dumpsterfire']
     candidate_articles = []
     quarantined_articles = []
 
-    def process_buffers_when(cond, tolerate_errors=False):
-        global candidate_articles
-        global quarantined_articles
-        if not cond:
-            return
-        candidate_insertion_error, candidate_insertion_msg, candidate_articles, candidate_problem_rows = insert_if(len(candidate_articles), table, candidate_articles)
-        poop_insertion_error, poop_insertion_msg, quarantined_articles, heinous_poop = insert_if(len(quarantined_articles), dumpsterfire, quarantined_articles)
-        for batch_error, bad_rows in zip([candidate_insertion_error, poop_insertion_error],
-                                    [candidate_problem_rows, heinous_poop]):
-            if batch_error:
-                for row_error, row in bad_rows:
-                    print(red(row))
-                    print(red(f"{row_error.__class__.__name__} :: {row_error}"))
-            if not tolerate_errors:
-                assert not batch_error, f"{len(bad_rows)} rows could not be inserted."
 
 
     passthrough_attrs = ("url", "city", "state", "loc", "site", "name")
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute(f"""
-            SELECT *
-            FROM   spiderqueue q
-            WHERE not EXISTS (
-                SELECT  -- SELECT list mostly irrelevant; can just be empty in Postgres
-                FROM   articles a
-                WHERE  a.url = q.url
-         ) and not EXISTS (
-                SELECT  -- SELECT list mostly irrelevant; can just be empty in Postgres
-                FROM   dumpsterfire b
-                WHERE  b.url = q.url
-         ) ORDER BY lastmod desc limit {LIMIT};
+    print(f"Loading seen urls...")
+    good_urls = db.query('SELECT url FROM articles a;')
+    bad_urls = db.query('select url from dumpsterfire b;')
+    seen = set()
+    seen.update([row['url'] for row in good_urls])
+    seen.update([row['url'] for row in bad_urls])
+    print(f"Loaded {len(list(seen))} seen urls.")
+    rows = {row["url"]: row for row in db.query("select * from spiderqueue order by lastmod desc;") if row['url'] not in seen}
+    print(f"Found {len(list(rows))} uncrawled urls...")
 
-
-    """)
-        rows = {row["url"]: row for row in cur.fetchall()}
-    print(green(f"[ process_queue ] :: Added {len(list(rows.keys()))} urls to the queue."))
     urls = list(rows.keys())[0 : min(LIMIT, len(list(rows.keys())))]
-    urls = random.sample(urls, k=len(urls))
+    # urls = random.sample(urls, k=len(urls))
+
+    print(green(f"[ process_queue ] :: Added {len(list(rows.keys()))} urls to the queue."))
     responses = fetch_all_responses(urls, MAX_REQUESTS)
 
     for url, res in responses.items():
         row = rows[url]
+        row['prediction'] = 'rejected'
+        row['mod_status'] = 'rejected'
         is_dumpsterfire = row['is_dumpsterfire']
-        target_buffer = quarantined_articles if is_dumpsterfire else candidate_articles
+
         if isinstance(res, str):
             row['ok']=False
-            target_buffer.append(row)
+
+            if is_dumpsterfire:
+                dumpsterfire.upsert(row, ['url'])
+                print(f"Inserted bad response from {row['url']} to dumpsterfire")
+                print(red(f"Response text: {res}"))
+            else:
+                table.upsert(row, ['url'])
+                print(f"Inserted bad response from {row['url']} to {table.name}")
+                print(red(f"Response text: {res}"))
 
             continue
         html = res.decoded
@@ -309,26 +292,51 @@ if __name__ == "__main__":
         except ValueError as e:
             row['ok'] = False
             row['error_msg'] = str(e)
+
             print(red(e))
-            target_buffer.append(row)
+
+            if is_dumpsterfire:
+                dumpsterfire.upsert(row, ['url'])
+                print(f"Inserted {row['url']} to dumpsterfire")
+            else:
+                table.upsert(row, ['url'])
+                print(f"Inserted {row['url']} to {table.name}")
             continue
         row = article.data
         # print(json.dumps(row, indent=4, default=lambda x: str(x) if isinstance(x, datetime.datetime) else x))
         if not all(k in row and row[k] for k in ("content", "title")):
+            missing_attrs = [k for k in ('content', 'title') if k not in row or not row[k]]
             row["ok"] = False
-            target_buffer.append(row)
+            row['error_msg'] = f"ParseError :: Failed to parse {len(missing_attrs)} required attributes : {missing_attrs}"
+            print(red(json.dumps(row, indent=4, default=lambda x: str(x) if isinstance(x, datetime.datetime) else x)))
+            if is_dumpsterfire:
+                dumpsterfire.upsert(row, ['url'])
+                print(f"Inserted bad row {row['url']} to dumpsterfire")
+            else:
+                table.upsert(row, ['url'])
+                print(f"Inserted bad row {row['url']} to {table.name}")
+
+
             continue
 
         try:
             tokens = list([t.strip() for t in re.split(r"\s+", row["content"].lower())])
             truncated_preview = " ".join(tokens[: min(100, len(tokens))])
             model_input = [row["title"].lower(), truncated_preview]
-            prediction, out = relevance_classifier.predict([model_input])
+            prediction, relevance_tensor = relevance_classifier.predict([model_input])
             row["prediction"] = ["rejected", "approved"][prediction[0]]
-            prediction, out = audience_classifier.predict([row["title"]])
+            prediction, audience_tensor = audience_classifier.predict([row["title"]])
+            vec = relevance_tensor[0].tolist() + audience_tensor[0].tolist()
+            row['docvec'] = vec
+            row['docvec_version'] = 'classifier_outputs'
+
             print(
                 f"Audience prediction: {prediction} ({audience_labels[prediction[0]]})"
             )
+            print(
+                f"Relevance classifier output (shape: {relevance_tensor.shape}): {blue(relevance_tensor)}"
+            )
+            print(f"Audience classifier output (shape: {audience_tensor.shape} : {blue(audience_tensor)}")
             row["audience"] = audience_labels[prediction[0]]
             row["mod_status"] = (
                 "pending" if row["prediction"] == "approved" else "rejected"
@@ -357,10 +365,34 @@ if __name__ == "__main__":
             )
             if is_dumpsterfire:
                 dumpsterfire.upsert(row, ['url'])
+                print(f"Inserted {row['url']} to dumpsterfire")
             else:
                 table.upsert(row, ['url'])
+                print(f"Inserted {row['url']} to {table.name}")
         except Exception as e:
             print(red(f"ERROR: {e.__class__.__name__} :: {e}", row))
             continue
+    candidates = list(url2tensor.values())
+    rel_tensors = [(url, candidate[0]) for url, candidate in url2tensor.items()]
+    audience_tensors = [(url, candidate[1]) for url, candidate in url2tensor.items()]
+    for url1, tensor1 in url2tensor.items():
+        rel_tensor1, audience_tensor1 = tensor1
+        k_nearest_rel = dict(list(sorted(rel_tensors, key=lambda x: cosine(x[1], rel_tensor1)))[0:5])
+        k_nearest_aud = dict(list(sorted(audience_tensors, key=lambda x: cosine(x[1], audience_tensor1)))[0:5])
+        print(f"================================= URL: {url1} =============================================")
+        print(magenta("Relevance k neighbors :"))
+        for i, rest in enumerate(k_nearest_rel.items()):
+            url2, tensor2 = rest
+            print(f"    {i}.  {green(url2)} ({cosine(rel_tensor1, tensor2)})")
+            print(f"           {grey(rel_tensor1)}")
+            print(f"           {grey(tensor2)}")
+        print("                              * * * * * * * * * * * * * * * * * * * * *")
+        print(blue("Audience k neighbors :"))
+        for i, rest in enumerate(k_nearest_aud.items()):
+            url2, tensor2 = rest
+            print(f"    {i}.  {green(url2)} ({cosine(audience_tensor1, tensor2)})")
+            print(f"           {grey(audience_tensor1)}")
+            print(f"           {grey(tensor2)}")
+
 
 
