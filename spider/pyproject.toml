@@ -23,6 +23,8 @@ dataset = "^1.3.1"
 termcolor = "^1.1.0"
 pytz = "^2020.1"
 brotlipy = "*"
+flatdict = "*"
+cssselect = "^1.1.0"
 
 [tool.poetry.dev-dependencies]
 
