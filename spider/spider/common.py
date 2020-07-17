@@ -21,11 +21,11 @@ config = {
         "database": "postgres",
     },
     "prod": {
-        "user": "postgres",
+        "user": "admin",
         "password": "Feigenbum4",
-        "host": "35.188.134.37",
+        "host": "64.225.121.255",
         "port": "5432",
-        "database": "postgres",
+        "database": "covidwire",
     },
 }
 

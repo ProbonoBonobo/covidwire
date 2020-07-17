@@ -3,7 +3,7 @@ from gemeinsprache.utils import yellow, green
 from flatdict import FlatterDict
 from ftfy import fix_text_segment
 import re
-
+from transformers import RobertaForSequenceClassification, RobertaTokenizer, pipelines
 
 class DotDict(dict):
     """
@@ -103,3 +103,20 @@ class Haystack(dict):
             if filtered:
                 return list(filtered.values())
         return []
+
+import numpy as np
+class Model:
+    def __init__(self, model_dir):
+        self.model = RobertaForSequenceClassification(model_dir, output_attentions=True, output_hidden_states=True)
+        self.tokenizer = RobertaTokenizer(model_dir, add_special_tokens=True, merges_file=os.path.join(model_dir, "merges.txt"))
+    def encode(self, sent):
+        tokenized = self.tokenizer.encode(sent, return_tensors="pt")
+        classifier, attentions, hidden_states  = self.model(tokenized)
+        return {repr(k): k for k in (classifier, attentions, hidden_states)}
+    def sent2vec(self, sent):
+        encoded = self.encode(sent)
+        tensors = encoded['hidden_states']
+        mean_vec = np.array([np.array(t[0].median(0).values.detach().numpy()) for t in tensors]).mean(0)
+
+
+
