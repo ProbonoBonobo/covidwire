@@ -47,6 +47,7 @@ def main():
                 row["created_at"] = datetime.datetime.now()
                 row["is_sitemap"] = True
                 row["is_content"] = False
+                row['selector'] = sitemaps[url]['selector']
             except Exception as e:
                 row["resolved_url"] = url
                 row["ok"] = False
@@ -67,7 +68,7 @@ def main():
         responses.append(row)
         print(row)
     for response in responses:
-        for k,v in response.items():
+        for k, v in response.items():
             print(blue(k), green(v))
     responsedb.upsert_many(responses, ["url"], ensure=True)
 

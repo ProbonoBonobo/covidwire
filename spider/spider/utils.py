@@ -4,6 +4,8 @@ from flatdict import FlatterDict
 from ftfy import fix_text_segment
 import re
 from transformers import RobertaForSequenceClassification, RobertaTokenizer, pipelines
+from gemeinsprache.utils import magenta, cyan, green, yellow, blue, red
+
 
 class DotDict(dict):
     """
@@ -23,6 +25,7 @@ class DotDict(dict):
             if hasattr(value, "keys"):
                 value = DotDict(value)
             self[key] = value
+        super().__init__()
 
 
 def load_metadata(soup):
@@ -41,11 +44,11 @@ def load_metadata(soup):
         if isinstance(_o, list):
             for __o in _o:
                 o[__o["@type"]] = __o
-        elif '@type' in _o and isinstance(_o["@type"], list):
+        elif "@type" in _o and isinstance(_o["@type"], list):
             for t in _o["@type"]:
                 for __o in _o:
                     o[t] = __o
-        elif '@type' in _o and _o['@type'] in o:
+        elif "@type" in _o and _o["@type"] in o:
             o[_o["@type"]] = _o
         else:
             continue
@@ -104,19 +107,155 @@ class Haystack(dict):
                 return list(filtered.values())
         return []
 
+
 import numpy as np
+
+
 class Model:
     def __init__(self, model_dir):
-        self.model = RobertaForSequenceClassification(model_dir, output_attentions=True, output_hidden_states=True)
-        self.tokenizer = RobertaTokenizer(model_dir, add_special_tokens=True, merges_file=os.path.join(model_dir, "merges.txt"))
+        self.model = RobertaForSequenceClassification(
+            model_dir, output_attentions=True, output_hidden_states=True
+        )
+        self.tokenizer = RobertaTokenizer(
+            model_dir,
+            add_special_tokens=True,
+            merges_file=os.path.join(model_dir, "merges.txt"),
+        )
+
     def encode(self, sent):
         tokenized = self.tokenizer.encode(sent, return_tensors="pt")
-        classifier, attentions, hidden_states  = self.model(tokenized)
+        classifier, attentions, hidden_states = self.model(tokenized)
         return {repr(k): k for k in (classifier, attentions, hidden_states)}
+
     def sent2vec(self, sent):
         encoded = self.encode(sent)
-        tensors = encoded['hidden_states']
-        mean_vec = np.array([np.array(t[0].median(0).values.detach().numpy()) for t in tensors]).mean(0)
+        tensors = encoded["hidden_states"]
+        mean_vec = np.array(
+            [np.array(t[0].median(0).values.detach().numpy()) for t in tensors]
+        ).mean(0)
 
 
+def get_selector(child):
+    path = list(reversed([node.name for node in child.parentGenerator()][:-1]))
+    if hasattr(child, "name") and child.name:
+        path.append(child.name)
+    return " ".join(path)
+
+
+def elect_best_selector(soup):
+    url = soup.url
+    candidates = []
+    votes = []
+    maybe_roots = (
+        ".article-content",
+        ".articleBody",
+        ".contentAccess",
+        ".article-body",
+        "#story",
+        "#articleBody",
+        "#article-body",
+        "#article-content",
+        "#article",
+        "article",
+    )
+    root = soup.select("body")
+    for slx in maybe_roots:
+        if soup.select(slx):
+            root = soup.select(slx)
+            # print(cyan(f"using selector {slx} for url {url}"))
+            votes = [slx]
+    for node in root:
+        for child in node.recursiveChildGenerator():
+            try:
+                if child.name in ("p"):
+                    slx = get_selector(child)
+                    classes = set()
+                    for parent in child.parentGenerator():
+                        if "class" in parent.attrs and parent.attrs["class"]:
+                            classes.update(parent.attrs["class"])
+                    if "class" in child.attrs and child.attrs["class"]:
+                        classes.update(child.attrs["class"])
+                    bad_classes = [
+                        c
+                        for c in classes
+                        if re.search(
+                            r"(comment|social|alert|promo|advertis)", c, re.IGNORECASE
+                        )
+                    ]
+                    if not bad_classes:
+
+                        candidates.append(
+                            (re.sub(r"\s+", " ", child.text.strip()), slx)
+                        )
+                    else:
+                        print(
+                            magenta(
+                                f"Skipping {child.name} node with classes {bad_classes}"
+                            )
+                        )
+            except:
+                continue
+    candidates = list(sorted(candidates, key=lambda x: len(x[0])))
+    # print(yellow(url))
+    for i, node in enumerate(candidates[-5:]):
+        u, slx = node
+        votes.append(slx)
+        # print(blue(i), green(u), len(u))
+    votes = list(sorted(votes, key=lambda x: votes.count(x), reverse=True))
+    if not votes:
+        votes = ['p']
+    winner = votes[0]
+    content = []
+    selected = soup.select(votes[0])
+    for node in selected:
+        for child in node.recursiveChildGenerator():
+            try:
+                if child and child.string and len(child.string.strip()) > 36:
+                    content.append(child.string.strip())
+            except Exception as e:
+                continue
+    content = "\n".join(content)
+    # print("=" * 80)
+    # print(red(winner))
+    # print(green(content))
+    # print("=" * 80)
+    return winner, content
+
+def extract_content(soup, slx):
+     smell = re.compile(r"(error|signup|your request|delivered every|let us know|plus:|" +
+                          r"by visiting|mailing list|follow him|follow her|columnist|your inbox|" +
+                          r"this story|contributed to|this site|to view|download|sorry,|this article" +
+                          r"|subscri|©|copyright|@|sign up|your opinion|share this|share on|read more" +
+                          r"|follow us|click here|this report|editor|staff writer|is a reporter|contact us|" +
+                          r"related:|log in|more:)", re.IGNORECASE)
+
+     selected = soup.select(slx)
+     content = []
+     for node in selected:
+         inherited_classes = set()
+         txt = node.text.strip()
+         if len(txt) >= 30 and re.search(r"[.\"?)”]$", txt):
+             for parent in node.parentGenerator():
+                 try:
+                     inherited_classes.update(parent.attrs['class'])
+                 except:
+                     continue
+             txt = re.sub(r"\s+", " ", txt)
+             if re.search(smell, txt):
+                 matches = re.findall(smell, txt)
+                 print(f"Ignoring {red(txt)}")
+                 print(f"    Matches: ", end="")
+                 for m in matches:
+                     print(f"            {yellow(m)}")
+                 continue
+             elif txt not in content:
+                 bad_classes = [c for c in inherited_classes if re.search(r"(comment|promo|advertis|social)", c)]
+                 if not bad_classes:
+
+                     content.append(txt)
+                 else:
+                     print(f"Skipping due to bad classes: {red(bad_classes)}")
+                     print(f"    skipped text: {yellow(txt)}")
+     content = '\n'.join(content)
+     return content
 

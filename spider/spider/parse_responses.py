@@ -62,16 +62,29 @@ def parse_sitemap(row, seen):
                 "loc": row["loc"],
                 "lastmod": lastmod,
                 "xmlmeta": xmlmeta,
-                "is_dumpsterfire": row['is_dumpsterfire']
+                "is_dumpsterfire": row["is_dumpsterfire"],
+                "selector": row['selector']
             }
-            if row['url'] not in seen:
+            if row["url"] not in seen:
                 rows.append(row)
-                print(blue(json.dumps(row, indent=4, default=lambda x: str(x) if isinstance(x, (bytes, datetime.datetime)) else x)))
+                print(
+                    blue(
+                        json.dumps(
+                            row,
+                            indent=4,
+                            default=lambda x: str(x)
+                            if isinstance(x, (bytes, datetime.datetime))
+                            else x,
+                        )
+                    )
+                )
                 seen.add(url.strip())
             if len(rows) > MAX_ARTICLES_PER_SOURCE:
                 break
 
-    rows = list(sorted(rows, key=lambda row: ensure_tztime(row["lastmod"]), reverse=True))
+    rows = list(
+        sorted(rows, key=lambda row: ensure_tztime(row["lastmod"]), reverse=True)
+    )
     print(
         magenta("[ fetch_sitemap ] "),
         f":: Extracted {len(rows)} urls from sitemap: {sitemap_url}",
@@ -83,12 +96,11 @@ if __name__ == "__main__":
     crawldb = db["articles"]
     responsedb = db["sitemaps"]
     spiderqueue = db["spiderqueue"]
-    dumpsterfire = db['dumpsterfire']
+    dumpsterfire = db["dumpsterfire"]
     seen.update([row["url"] for row in db.query("select url from spiderqueue")])
-    seen.update([row['url'] for row in db.query("select url from articles")])
-    seen.update([row['url'] for row in db.query("select url from dumpsterfire")])
+    seen.update([row["url"] for row in db.query("select url from articles")])
+    seen.update([row["url"] for row in db.query("select url from dumpsterfire")])
     # seen.update([row['url'] for row in dumpsterfire])
-
 
     queue = [row for row in responsedb]
 
@@ -99,10 +111,8 @@ if __name__ == "__main__":
         parsed.extend(rows)
         if rows:
             print(f"Inserting {len(rows)} rows...")
-            spiderqueue.upsert_many(rows, ['url'])
+            spiderqueue.upsert_many(rows, ["url"])
             print(f"Insert complete.")
     # print(f"Upserting {len(parsed)} rows...")
     # spiderqueue.insert_many(parsed, ['url'])
     print(f"Update complete.")
-
-

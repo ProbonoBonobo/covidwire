@@ -1,5 +1,6 @@
 from spider.common import init_db
 from spider.async_utils import fetch_all_responses
+from spider.utils import extract_content
 from gemeinsprache.utils import green, cyan, yellow, red, magenta, blue, grey
 from date_guesser import guess_date
 from dateutil.parser import parse as parse_timestamp
@@ -15,6 +16,7 @@ import datetime
 from spider.utils import DotDict, Haystack
 import torch
 from scipy.spatial.distance import cosine
+
 audience_labels = [
     "international",
     "city",
@@ -23,8 +25,8 @@ audience_labels = [
     "indefinite",
     "state",
 ]
-LIMIT = os.getenv('SPIDER_LIMIT', 500)
-MAX_REQUESTS = os.getenv('MAX_REQUESTS', 5)
+LIMIT = os.getenv("SPIDER_LIMIT", 500)
+MAX_REQUESTS = os.getenv("MAX_REQUESTS", 5)
 
 
 NULL_DATE = datetime.datetime(1960, 1, 1)
@@ -43,7 +45,7 @@ audience_classifier = ClassificationModel(
         "lib/audience_classifier/v1.0",
     ),
     num_labels=len(audience_labels),
-    use_cuda=int(torch.cuda.is_available())
+    use_cuda=int(torch.cuda.is_available()),
 )
 
 UniversalSelector = DotDict(
@@ -77,7 +79,11 @@ class Article:
     def __init__(self, url, html, row, soup=None, lxml=None, fix_encoding_errors=True):
         self.url = url
         self.sitemap_data = row
-        self.html = fix_text_segment(html.replace("\xa0", " "), uncurl_quotes=False) if fix_encoding_errors else html
+        self.html = (
+            fix_text_segment(html.replace("\xa0", " "), uncurl_quotes=False)
+            if fix_encoding_errors
+            else html
+        )
         try:
 
             self.soup = soup if soup else BeautifulSoup(self.html)
@@ -87,7 +93,7 @@ class Article:
         # print(json.dumps(self.meta, indent=4))
         try:
             if isinstance(self.html, str):
-                self.html = self.html.encode('utf-8')
+                self.html = self.html.encode("utf-8")
             self.lxml = lxml if lxml else parse_html(self.html)
         except Exception as e:
             raise ValueError(f"{e.__class__.__name__} :: {e}, {self.html}")
@@ -146,8 +152,14 @@ class Article:
 
     @property
     def content(self):
+        content = ""
+        if 'selector' in row and row['selector']:
+            content = extract_content(self.soup, row['selector'])
+            if len(content) >= 250:
+                return content
+        else:
+            nodes = self.soup.select(UniversalSelector.content)
         txt = []
-        nodes = self.soup.select(UniversalSelector.content)
         if not list(nodes):
             nodes = self.soup.select("p")
         for node in nodes:
@@ -237,54 +249,56 @@ class Article:
             return result
 
 
-
-
 print(f"Initializing db...")
 db = init_db()
 print("initialized.")
 if __name__ == "__main__":
     url2tensor = {}
 
-    spiderqueue = db['spiderqueue']
+    spiderqueue = db["spiderqueue"]
     table = db["articles"]
-    dumpsterfire = db['dumpsterfire']
+    dumpsterfire = db["dumpsterfire"]
     candidate_articles = []
     quarantined_articles = []
 
-
-
     passthrough_attrs = ("url", "city", "state", "loc", "site", "name")
     print(f"Loading seen urls...")
-    good_urls = db.query('SELECT url FROM articles a;')
-    bad_urls = db.query('select url from dumpsterfire b;')
+    good_urls = db.query("SELECT url FROM articles a;")
+    bad_urls = db.query("select url from dumpsterfire b;")
     seen = set()
-    seen.update([row['url'] for row in good_urls])
-    seen.update([row['url'] for row in bad_urls])
+    seen.update([row["url"] for row in good_urls])
+    seen.update([row["url"] for row in bad_urls])
     print(f"Loaded {len(list(seen))} seen urls.")
-    rows = {row["url"]: row for row in db.query("select * from spiderqueue order by lastmod desc;") if row['url'] not in seen}
+    rows = {
+        row["url"]: row
+        for row in db.query("select * from spiderqueue order by lastmod desc;")
+        if row["url"] not in seen
+    }
     print(f"Found {len(list(rows))} uncrawled urls...")
 
     urls = list(rows.keys())[0 : min(LIMIT, len(list(rows.keys())))]
     # urls = random.sample(urls, k=len(urls))
 
-    print(green(f"[ process_queue ] :: Added {len(list(rows.keys()))} urls to the queue."))
+    print(
+        green(f"[ process_queue ] :: Added {len(list(rows.keys()))} urls to the queue.")
+    )
     responses = fetch_all_responses(urls, MAX_REQUESTS)
 
     for url, res in responses.items():
         row = rows[url]
-        row['prediction'] = 'rejected'
-        row['mod_status'] = 'rejected'
-        is_dumpsterfire = row['is_dumpsterfire']
+        row["prediction"] = "rejected"
+        row["mod_status"] = "rejected"
+        is_dumpsterfire = row["is_dumpsterfire"]
 
         if isinstance(res, str):
-            row['ok']=False
+            row["ok"] = False
 
             if is_dumpsterfire:
-                dumpsterfire.upsert(row, ['url'])
+                dumpsterfire.upsert(row, ["url"])
                 print(f"Inserted bad response from {row['url']} to dumpsterfire")
                 print(red(f"Response text: {res}"))
             else:
-                table.upsert(row, ['url'])
+                table.upsert(row, ["url"])
                 print(f"Inserted bad response from {row['url']} to {table.name}")
                 print(red(f"Response text: {res}"))
 
@@ -293,32 +307,45 @@ if __name__ == "__main__":
         try:
             article = Article(url, html, row)
         except ValueError as e:
-            row['ok'] = False
-            row['error_msg'] = str(e)
+            row["ok"] = False
+            row["error_msg"] = str(e)
 
             print(red(e))
 
             if is_dumpsterfire:
-                dumpsterfire.upsert(row, ['url'])
+                dumpsterfire.upsert(row, ["url"])
                 print(f"Inserted {row['url']} to dumpsterfire")
             else:
-                table.upsert(row, ['url'])
+                table.upsert(row, ["url"])
                 print(f"Inserted {row['url']} to {table.name}")
             continue
         row = article.data
         # print(json.dumps(row, indent=4, default=lambda x: str(x) if isinstance(x, datetime.datetime) else x))
         if not all(k in row and row[k] for k in ("content", "title")):
-            missing_attrs = [k for k in ('content', 'title') if k not in row or not row[k]]
+            missing_attrs = [
+                k for k in ("content", "title") if k not in row or not row[k]
+            ]
             row["ok"] = False
-            row['error_msg'] = f"ParseError :: Failed to parse {len(missing_attrs)} required attributes : {missing_attrs}"
-            print(red(json.dumps(row, indent=4, default=lambda x: str(x) if isinstance(x, datetime.datetime) else x)))
+            row[
+                "error_msg"
+            ] = f"ParseError :: Failed to parse {len(missing_attrs)} required attributes : {missing_attrs}"
+            print(
+                red(
+                    json.dumps(
+                        row,
+                        indent=4,
+                        default=lambda x: str(x)
+                        if isinstance(x, datetime.datetime)
+                        else x,
+                    )
+                )
+            )
             if is_dumpsterfire:
-                dumpsterfire.upsert(row, ['url'])
+                dumpsterfire.upsert(row, ["url"])
                 print(f"Inserted bad row {row['url']} to dumpsterfire")
             else:
-                table.upsert(row, ['url'])
+                table.upsert(row, ["url"])
                 print(f"Inserted bad row {row['url']} to {table.name}")
-
 
             continue
 
@@ -330,8 +357,8 @@ if __name__ == "__main__":
             row["prediction"] = ["rejected", "approved"][prediction[0]]
             prediction, audience_tensor = audience_classifier.predict([row["title"]])
             vec = relevance_tensor[0].tolist() + audience_tensor[0].tolist()
-            row['docvec'] = vec
-            row['docvec_version'] = 'classifier_outputs'
+            row["docvec"] = vec
+            row["docvec_version"] = "classifier_outputs"
 
             print(
                 f"Audience prediction: {prediction} ({audience_labels[prediction[0]]})"
@@ -339,7 +366,9 @@ if __name__ == "__main__":
             print(
                 f"Relevance classifier output (shape: {relevance_tensor.shape}): {blue(relevance_tensor)}"
             )
-            print(f"Audience classifier output (shape: {audience_tensor.shape} : {blue(audience_tensor)}")
+            print(
+                f"Audience classifier output (shape: {audience_tensor.shape} : {blue(audience_tensor)}"
+            )
             row["audience"] = audience_labels[prediction[0]]
             row["mod_status"] = (
                 "pending" if row["prediction"] == "approved" else "rejected"
@@ -367,10 +396,10 @@ if __name__ == "__main__":
                 f"PREDICTION: {red(row['prediction'].upper()) if row['prediction'] == 'rejected' else green(row['prediction'].upper())}"
             )
             if is_dumpsterfire:
-                dumpsterfire.upsert(row, ['url'])
+                dumpsterfire.upsert(row, ["url"])
                 print(f"Inserted {row['url']} to dumpsterfire")
             else:
-                table.upsert(row, ['url'])
+                table.upsert(row, ["url"])
                 print(f"Inserted {row['url']} to {table.name}")
         except Exception as e:
             print(red(f"ERROR: {e.__class__.__name__} :: {e}", row))
@@ -380,9 +409,17 @@ if __name__ == "__main__":
     audience_tensors = [(url, candidate[1]) for url, candidate in url2tensor.items()]
     for url1, tensor1 in url2tensor.items():
         rel_tensor1, audience_tensor1 = tensor1
-        k_nearest_rel = dict(list(sorted(rel_tensors, key=lambda x: cosine(x[1], rel_tensor1)))[0:5])
-        k_nearest_aud = dict(list(sorted(audience_tensors, key=lambda x: cosine(x[1], audience_tensor1)))[0:5])
-        print(f"================================= URL: {url1} =============================================")
+        k_nearest_rel = dict(
+            list(sorted(rel_tensors, key=lambda x: cosine(x[1], rel_tensor1)))[0:5]
+        )
+        k_nearest_aud = dict(
+            list(
+                sorted(audience_tensors, key=lambda x: cosine(x[1], audience_tensor1))
+            )[0:5]
+        )
+        print(
+            f"================================= URL: {url1} ============================================="
+        )
         print(magenta("Relevance k neighbors :"))
         for i, rest in enumerate(k_nearest_rel.items()):
             url2, tensor2 = rest
@@ -396,6 +433,3 @@ if __name__ == "__main__":
             print(f"    {i}.  {green(url2)} ({cosine(audience_tensor1, tensor2)})")
             print(f"           {grey(audience_tensor1)}")
             print(f"           {grey(tensor2)}")
-
-
-
