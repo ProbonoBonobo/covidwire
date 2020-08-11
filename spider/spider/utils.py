@@ -222,7 +222,7 @@ def elect_best_selector(soup):
     return winner, content
 
 def extract_content(soup, slx):
-     smell = re.compile(r"(error|signup|your request|delivered every|let us know|plus:|" +
+     smell = re.compile(r"(error|email|Facebook|Twitter|signup|your request|delivered every|let us know|plus:|" +
                           r"by visiting|mailing list|follow him|follow her|columnist|your inbox|" +
                           r"this story|contributed to|this site|to view|download|sorry,|this article" +
                           r"|subscri|©|copyright|@|sign up|your opinion|share this|share on|read more" +
