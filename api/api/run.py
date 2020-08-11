@@ -49,18 +49,18 @@ def get_scored_results():
         results = cache[fips][1]
     else:
         query = f"""SELECT distinct on (title)
-        id, published_at, name, title, description, content, url, docvec, ner, image_url, audience, cast(scored ->> '{fips}' as float)  / (extract(days from (now() - published_at)) * 2 + 1) as score
+        id, published_at, name, title, description, content, url, docvec_v2[0:8], ner, image_url, audience, mod_status, prediction, city, state, loc, metadata, cast(scored ->> '{fips}' as float)  / (extract(days from (now() - published_at)) * 2 + 1) as score
     FROM
         articles
-    WHERE scored ->> '{fips}' != '0';"""
+    WHERE prediction = 'approved' and scored ->> '{fips}' != '0';"""
         results = []
-        for r in sorted(db.query(query), key=lambda x: x['score'], reverse=True):
-            try:
-                r['docvec'] = list(map(float,r['docvec'][1:-1].split(",")))
-
-
-            except:
-                r['docvec'] = [x*0.00000001 for x in random.sample(range(-70000000,70000000), 8)]
+        for r in sorted(list(db.query(query)), key=lambda x: x['score'], reverse=True):
+            # try:
+            #     r['docvec'] = list(map(float,r['docvec'][1:-1].split(",")))
+            #
+            #
+            # except:
+            #     r['docvec'] = [x*0.00000001 for x in random.sample(range(-70000000,70000000), 8)]
             results.append(r)
 
         cache[fips] = [time.time() + 3200, results]
@@ -70,7 +70,7 @@ def get_scored_results():
     if kwargs['audience']:
         audience = kwargs['audience']
         results = [result for result in results if result['audience'] == audience]
-    results = results[start:stop]
+    results = results[start:min(stop, len(results))]
     response = app.response_class(
         response = json.dumps(results, indent=4, default=lambda x: x if not isinstance(x, datetime.datetime) else x.isoformat()),
         status=200,
