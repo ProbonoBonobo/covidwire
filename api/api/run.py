@@ -1,6 +1,7 @@
 import flask
 from flask import request
 from api.creds import db_config
+from flask_cors import CORS
 from scipy.spatial.distance import euclidean, cosine
 import datetime
 import dataset
@@ -16,6 +17,8 @@ db = dataset.connect(
 articles = db['articles']
 
 app = flask.Flask(__name__)
+cors = CORS(app)
+app.config['CORS_HEADERS'] = 'Content-Type'
 app.config["DEBUG"] = True
 import numpy as np
 from collections import defaultdict
