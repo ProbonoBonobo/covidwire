@@ -157,6 +157,7 @@ class Article:
             content = extract_content(self.soup, row['selector'])
             if len(content) >= 250:
                 return content
+            nodes = []
         else:
             nodes = self.soup.select(UniversalSelector.content)
         txt = []
