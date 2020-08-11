@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "covidwire-api"
+version = "0.1.0"
+description = "HTTP interface to SQL database"
+authors = ["Kevin Zeidler <kzeidler@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+flask = "^1.1.2"
+dataset = "^1.3.2"
+psycopg2 = "^2.8.5"
+
+[tool.poetry.dev-dependencies]
+ptpython = "^3.0.3"
+ipython = "^7.17.0"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
