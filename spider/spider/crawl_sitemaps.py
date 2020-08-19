@@ -48,6 +48,7 @@ def main():
                 row["is_sitemap"] = True
                 row["is_content"] = False
                 row['selector'] = sitemaps[url]['selector']
+
             except Exception as e:
                 row["resolved_url"] = url
                 row["ok"] = False

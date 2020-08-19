@@ -25,6 +25,8 @@ pytz = "^2020.1"
 brotlipy = "*"
 flatdict = "*"
 cssselect = "^1.1.0"
+flask-cors = "^3.0.8"
+metadata_parser = "^0.10.0"
 
 [tool.poetry.dev-dependencies]
 

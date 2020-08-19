@@ -93,7 +93,7 @@ def parse_sitemap(row, seen):
 
 
 if __name__ == "__main__":
-    crawldb = db["articles"]
+    crawldb = db["articles_v2"]
     responsedb = db["sitemaps"]
     spiderqueue = db["spiderqueue"]
     dumpsterfire = db["dumpsterfire"]

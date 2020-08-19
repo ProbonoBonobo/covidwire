@@ -5,6 +5,7 @@ import allennlp
 import allennlp_models
 import textwrap
 import datetime
+
 from collections import defaultdict
 import re
 import json
@@ -12,9 +13,9 @@ from gemeinsprache.utils import red, green, cyan, magenta, blue, yellow
 import torch
 
 LIMIT_ARTICLES = 9999999
-
+TABLE = "articles_v2"
 db = init_db()
-crawldb = db["articles"]
+crawldb = db[TABLE]
 allennlp_model = None
 
 import allennlp_models.tagging
@@ -125,11 +126,12 @@ if __name__ == "__main__":
         # )
         summary = row['description'] if row['description'] else ''
         title = row['title'] if row['title'] else ''
-        content = row['content'] if row['content'] else ''
+        content = re.split("\s+", row['content']) if row['content'] else []
+        content = ' '.join(content[0:min(len(content),300)])
         counts = extract_entities_with_allennlp(
             title, summary, *content.split("\n")
         )
-        updates.append({"id": row["id"], "ner": counts})
+        updates.append({"url": row['url'], "ner": counts})
         print(
             magenta(
                 f"Processing complete. ( {len(updates)} / 50 ) rows queued for insertion."
@@ -137,6 +139,6 @@ if __name__ == "__main__":
         )
         if len(updates) > 50:
             print(f"Inserting 50 rows...")
-            crawldb.update_many(updates, ["id"])
+            crawldb.update_many(updates, ["url"])
             updates = []
-    crawldb.update_many(updates, ["id"])
+    crawldb.update_many(updates, ["url"])

@@ -3,6 +3,7 @@ from shapely.geometry import Polygon, MultiPolygon, Point
 from munch import Munch
 import os
 import numpy as np
+import random
 from gemeinsprache.utils import green, yellow, blue, cyan, red, magenta
 import googlemaps
 from collections import defaultdict
@@ -25,7 +26,7 @@ import psycopg2
 import os
 
 GENERATE_PLOTS = False
-
+TABLE = 'articles_v2'
 # #
 db_config = {
     "user": "kz",
@@ -40,11 +41,11 @@ local_db = dataset.connect(
 
 # Production DB
 db_config = {
-    "user": "postgres",
+    "user": "admin",
     "password": os.environ.get("MODERATION_PASSWORD", "Feigenbum4"),
-    "host": "35.188.134.37",
+    "host": "64.225.121.255",
     "port": "5432",
-    "database": "postgres",
+    "database": "covidwire",
 }
 
 db = dataset.connect(
@@ -60,7 +61,15 @@ from gemeinsprache.utils import blue, green, cyan, yellow, magenta
 
 nlp = None
 allennlp_model = None
-
+query_rewrite_rules = {
+    "U.S.": "United States",
+    "U.S" : "United States",
+    "US": "United States",
+    "Wall Street": "Manhattan, New York",
+    "White House": "Washington, D.C.",
+    "UC San Diego": "University of California, San Diego",
+    "UCSD": "University of California, San Diego"
+}
 
 def deg2dec(coord):
     patt = re.compile(
@@ -125,18 +134,19 @@ import dill
 
 def cache_queries(func):
     sym = func.__name__
-
+    cachepath = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cache.dill")
     argmapper = serialize_call_args(func)
 
     def wrapped(*args, **kwargs):
-        cache = {}
-        try:
-            with open(".cache.dill", "rb") as f:
-                cache = dill.load(f)
-        except:
-            cache = {}
-            with open(".cache.dill", "wb") as f:
-                dill.dump(cache, f)
+        if 'cache' not in globals():
+            global cache
+            try:
+                with open(".cache.dill", "rb") as f:
+                    cache = dill.load(f)
+            except:
+                cache = {}
+                with open(".cache.dill", "wb") as f:
+                    dill.dump(cache, f)
         if sym not in cache:
             cache[sym] = {}
         call_args = argmapper(*args, **kwargs)
@@ -152,8 +162,9 @@ def cache_queries(func):
         out = func(*args, **kwargs)
         call_args["__output__"] = out
         cache[sym][hashable] = call_args
-        with open(".cache.dill", "wb") as f:
-            dill.dump(cache, f)
+        if not random.randint(0, 150):
+            with open(".cache.dill", "wb") as f:
+                dill.dump(cache, f)
         return cache[sym][hashable]["__output__"]
 
     return wrapped
@@ -165,7 +176,7 @@ with urlopen(
     plotly_data = json.load(response)
 # API_KEY = os.environ['GOOGLE_MAPS_API_KEY']
 
-crawldb = db["articles"]
+crawldb = db[TABLE]
 shapedb = db["geojson"]
 counties = {}
 states = {}
@@ -194,7 +205,6 @@ def calculate_bounding_box(point, km):
     return c1, c2
 
 
-blacklisted_ents = ("Wall St.", "Congress", "The City")
 
 
 def diag2poly(p1, p2):
@@ -230,7 +240,7 @@ def get_bounding_box(s, poi=None):
     def get_locationbias(sourceloc):
         response = geocode(sourceloc)
         lat, lon = list(response[0]["geometry"]["location"].values())
-        querystring = f"circle:50000@{lat},{lon}"
+        querystring = f"point:{lat},{lon}"
         bias[sourceloc] = querystring
         return querystring
 
@@ -326,16 +336,8 @@ def visualize(df, title, subtitle, center, article_id, content):
 
 #
 jaro_winkler = JaroWinkler()
-cumsums = []
-with conn.cursor() as curr:
-    curr.execute("select scored from articles where scored is not null;")
-    for row in curr.fetchall():
-        if row[0]:
-            arr = np.array(list(row[0].values()))
-            sos = (arr ** 2).sum()
-            cumsums.append(sos)
 
-global_sos = np.mean(np.array(cumsums))
+
 import shapely
 
 
@@ -367,7 +369,7 @@ for i, row in enumerate(db["geojson_v4"]):
 batch = []
 queue = list(
     sorted(
-        [row for row in crawldb.find(scored=None, mod_status="pending")],
+        [row for row in crawldb if row['published_at']],
         key=lambda x: x["published_at"],
         reverse=True,
     )
@@ -377,6 +379,8 @@ my_loc = [float(os.getenv("LAT", 32.74)), float(os.getenv("LONG", -117.13))]
 for row in queue:
     if not row["ner"]:
         continue
+
+
     print(row)
 
     entry = [row["title"], row["description"], row["content"]]
@@ -384,16 +388,20 @@ for row in queue:
     ents = row["ner"]
     sourceloc = row["loc"]
     state = row["state"]
+    resolved_entities = {}
     resolved_names = defaultdict(list)
     if not ents:
         continue
     acc = {k: 0 for k in county2fips.keys()}
     for ent, weight in ents.items():
+        if ent in query_rewrite_rules:
+            ent = query_rewrite_rules[ent]
 
         result = Munch(get_bounding_box(ent, sourceloc))
+        resolved_entities[ent] = result.name
         location_bias = result.bias
         print(f"Location bias: {location_bias}")
-        origin_coords = [float(x) for x in location_bias.split("@")[-1].split(",")]
+        origin_coords = [float(x) for x in location_bias.split(":")[-1].split(",")]
         origin = Point(origin_coords)
 
         # print(result)
@@ -403,7 +411,7 @@ for row in queue:
             continue
         poly = result.poly if ent not in state_shapes else state_shapes[ent]
         difference_penalty = pow(
-            jaro_winkler.normalized_similarity(result.name, ent), 2
+            jaro_winkler.normalized_similarity(result.name, ent), 3
         )
         for county, hull in counties.items():
 
@@ -414,7 +422,7 @@ for row in queue:
 
                 distance_from_target = (
                     1
-                    if hull.contains(poly) or poly.contains(hull)
+                    if hull.contains(poly) or poly.contains(hull) or hull.almost_equals(poly)
                     else 1 / sqrt((1 + geodesic(c1, c2).km) / 4)
                 )
                 # distance_from_source = origin.distance(hull)
@@ -438,11 +446,10 @@ for row in queue:
                 acc[county] += relevance_score
     acc = {k: v for k, v in acc.items()}
     local_arr = np.array(list(acc.values()))
-    if local_arr.max() >= 36:
-        scalar_coeff = 36 / local_arr.max()
+    if local_arr.max() >= 20:
+        scalar_coeff = 20 / local_arr.max()
         local_arr = local_arr * scalar_coeff
         acc = dict(zip(acc.keys(), local_arr))
-    local_sos = (local_arr ** 2).sum()
     # if local_sos > global_sos:
     #     scalar_ratio = local_sos / global_sos
     #     print(cyan(f"Rescaling by constant factor of {scalar_ratio} (global mean: {global_sos}; local mean: {local_sos})"))
@@ -459,32 +466,28 @@ for row in queue:
     for line in wrap(row["content"]):
         print(yellow(line),)
     ranked = list(sorted(list(acc.items()), key=lambda x: x[1], reverse=True))
-    for county, score in sorted(list(acc.items()), key=lambda x: x[1], reverse=True):
-        if score >= 0.2:
-
-            print(
-                f"{green(county):<36} :: {blue(score)} {magenta(resolved_names[county])}"
-            )
-    _row = dict(
-        {
+    # for county, score in sorted(list(acc.items()), key=lambda x: x[1], reverse=True):
+    #     if score >= 0.2:
+    #
+    #         print(
+    #             f"{green(county):<36} :: {blue(score)} {magenta(resolved_names[county])}"
+    #         )
+    row.update({
             "ner": ents,
-            "scored": {county2fips[k]: v for k, v in acc.items()},
-            "url": row["url"],
-        },
-        **row,
-    )
-    from dataset.types import JSON
+            "scoring_version": "v3:jarowinkler-cubic-rampup-penalty-maxscore-20",
+            "scored": {county2fips[k]: round(v, 4) for k, v in acc.items()},
+            "resolved_entities": resolved_entities,
+        })
 
-    batch.append(_row)
+    print({k:v for k,v in row['scored'].items() if v > 0})
+    batch.append(row)
     # for k,v in list(globals().items()):
     #     print(blue(k), " :: ", magenta(v))
     # pause = input("Press any key to continue, or :q to quit")
     # if pause == ':q':
     #     breakpoint()
 
-    if len(batch) > 5:
-        crawldb.update_many(batch, ["url"])
-        batch = []
+    crawldb.update(row, ['url'])
     if GENERATE_PLOTS:
         lng, lat = list(counties[ranked[0][0]].centroid.coords)[0]
         center = {"lat": lat, "lon": lng}
@@ -500,7 +503,7 @@ for row in queue:
             ]
         )
         if max(struct.z) >= 0.2:
-            title = f"[#{row['id']}] {row['title']} ({row['name']}, {row['loc']})"
+            title = f"[#{row['url']}] {row['title']} ({row['name']}, {row['loc']})"
             subtitle = {row["description"]}
-            visualize(struct, title, subtitle, center, row["id"], chunked)
+            visualize(struct, title, subtitle, center, row["url"], chunked)
 print(len(queue))

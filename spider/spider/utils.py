@@ -78,17 +78,25 @@ def load_metadata(soup):
     print(flat)
     return flat
 
-
-class Haystack(dict):
-    def __init__(self, soup):
-        super().__init__(load_metadata(soup))
-
+from flatdict import FlatterDict, FlatDict
+from metadata_parser import MetadataParser
+class Haystack:
+    def __init__(self, html):
+        self.meta = MetadataParser(html=html).metadata
+        try:
+            self.data = json.load(json.dumps(FlatterDict(self.meta)))
+        except:
+            self.data = self.meta
+    def __repr__(self):
+        return json.dumps(self.data, indent=4)
+    def __dict__(self):
+        return self.data
     def search(self, attrs: list, atoms_only=True):
         default = None
         for k in attrs:
-            if k in self:
+            if k in self.data:
                 try:
-                    v = self.__getitem__(k)
+                    v = self.data.__getitem__(k)
                 except Exception as e:
                     print(e.__class__.__name__, e, k)
                     continue
@@ -102,7 +110,7 @@ class Haystack(dict):
 
     def re_search(self, regex_attrs, atoms_only=True):
         for k1 in regex_attrs:
-            filtered = {k2: v2 for k2, v2 in self.items() if re.search(k1, k2)}
+            filtered = {k2: v2 for k2, v2 in self.data.items() if re.search(k1, k2)}
             if filtered:
                 return list(filtered.values())
         return []
