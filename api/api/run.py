@@ -10,18 +10,17 @@ import time
 import html
 from urllib.parse import unquote_plus as urldecode
 cache = {}
+TABLE = "articles_v2"
 
 db = dataset.connect(
         f"postgresql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}"
     )
-articles = db['articles']
+articles = db[TABLE]
 
 app = flask.Flask(__name__)
 cors = CORS(app)
 app.config['CORS_HEADERS'] = 'Content-Type'
 app.config["DEBUG"] = True
-import numpy as np
-from collections import defaultdict
 
 
 @app.route('/', methods=['GET'])
@@ -52,9 +51,9 @@ def get_scored_results():
         results = cache[fips][1]
     else:
         query = f"""SELECT distinct on (title)
-        id, published_at, name, title, description, content, url, docvec_v2[0:8], ner, image_url, audience, mod_status, prediction, city, state, loc, metadata, cast(scored ->> '{fips}' as float)  / (extract(days from (now() - published_at)) * 2 + 1) as score
+        published_at, name, title, description, url, docvec_v2 as docvec, ner, image_url, audience, mod_status, prediction, city, state, loc, cast(scored ->> '{fips}' as float)  / (extract(days from (now() - published_at)) + 1) as score
     FROM
-        articles
+        {TABLE}
     WHERE prediction = 'approved' and scored ->> '{fips}' != '0';"""
         results = []
         for r in sorted(list(db.query(query)), key=lambda x: x['score'], reverse=True):
