@@ -1,0 +1,91 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap');
+
+:root {
+    --primary:rgba(192, 204, 219, 1);
+}
+.nav-link:focus, .nav-link:active, .nav-link:hover, .nav-pills .nav-link.active, .nav-pills .show>.nav-link, {
+    background-color: rgba(186, 83, 46, 1) !important;
+    color: #f7f9f9
+}
+a {
+    color: rgba(192, 204, 219, 1);
+}
+.form-control:focus {
+    box-shadow: 0 0 3px 3px rgba(162, 171, 181, 0.1);
+    color:  #f7f9f9;
+}
+.form-control, .form-control > *,  .Select-menu-outer, .input-group > div, .input-group > div > *, .Select-control, .Select-control * {
+    background-color: rgba(79, 88, 97, 1) !important;
+    font-family: "Helvetica Neue", "Helvetica", Helvetica, Arial, sans-serif;
+    color: #f7f9f9;
+}
+.icon-md {
+    width: 2.8rem !important;
+    height: 2.8rem !important;
+    margin-right: .8rem;
+}
+html, body{
+    position: relative;
+    min-height: 100%;
+    min-width: 100%;
+    background-color: #303030
+}
+.lead {
+    color: #BA532E;
+    margin: 1.618vh 0 0 0.21vh;
+    font-family: "Cormorant Garamond", serif;
+    font-weight: 300 !important;
+    font-size: 2.1rem;
+    font-style: italic;
+    line-height: 2.9rem;
+}
+.ml-text{
+    color: #BA532E;
+    font-family: monospace;
+    font-size: 2.1rem;
+    line-height:2.9rem;
+    margin-bottom: 3vh;
+}
+.display-4 {
+    font-family: "Cormorant Garamond";
+    font-weight: 700 !important;
+}
+.flexy {
+    display: flex;
+    flex-flow: row wrap;
+
+    /*justify-content: space-evenly;*/
+    justify-items: flex-end;
+    /*!*justify-content: stretch;*!*/
+
+    /*!*justify-items:stretch;*!*/
+    /*!*justify-content: space-around;*!*/
+    /*!*align-content: center;*!*/
+    /*height: 100%;*/
+    /*align-items: flex-start;*/
+    padding-bottom: 5vh;
+    /*background-color: aquamarine;*/
+}
+.flexy > * {
+    margin-bottom: 5vh;
+}
+h1 {
+    font-family: "Cormorant Garamond", serif;
+    font-weight: 700 !important;
+    margin-bottom: 0;
+}
+.article-content:first-child {
+    margin-top: 5.57vh;
+}
+.article-content {
+    margin-top: 3.37vh;
+    font-family: "Cormorant Garamond", serif;
+    font-weight: 500 !important;
+    font-size: 2.1rem;
+    line-height: 2.9rem;
+
+}
+.hidden {
+    display: none !important;
+    visibility: hidden !important;
+}
