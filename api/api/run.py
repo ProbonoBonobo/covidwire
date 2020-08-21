@@ -81,5 +81,66 @@ def get_scored_results():
     # return f"""<h1>Query Parameters:</h1><p>{formatted_args}</p>
     #                <h2>Results:</h2><div>{formatted_results}</div>"""
 
+@app.route('/classified', methods=['GET'])
+def get_classifier_predictions():
+    actual_labels = ("approved", "rejected", "international", "city", "regional", "national", "indefinite", "state")
+    classifier_labels = ("approved", "rejected", "international", "local", "regional", "national", "unbound", "state")
+    transtable = dict(zip(actual_labels, classifier_labels))
+
+    kwargs = {"audience": "local,regional,state,national,international,indefinite",
+              "sortOrder": "ambiguity",
+              "_limit": 50}
+    def ambiguousness(indices):
+        def inner(row):
+            vec = row['docvec_v2']
+            ordered = list(sorted([(v, index) for index, v in enumerate(vec)], reverse=True))
+            _max, _maxindex = ordered[0]
+            if _maxindex in indices:
+                _nextmax, _nextmaxindex = ordered[1]
+                return abs(_max - _nextmax)
+            else:
+                return -1
+        return inner
+    def gradient(indices):
+        def inner(row):
+            vec = [x for i,x in enumerate(row['docvec_v2']) if i in indices]
+            _max = max(vec)
+            print(_max)
+            return _max
+        return inner
+
+
+    _kwargs = {k: urldecode(v) for k, v in request.args.items()} or {}
+    kwargs.update(_kwargs)
+    print(kwargs)
+    keys = {"ambiguity": ambiguousness, "gradient descent": gradient}
+    sort_function = keys[kwargs['sortOrder']]
+    if str(kwargs) in cache and cache[str(kwargs)][0] > time.time():
+        results = cache[str(kwargs)][1]
+    else:
+        selected_labels = set(kwargs['audience'].split(","))
+        if not all(label in classifier_labels for label in selected_labels):
+            response = app.response_class( response = "invalid audience: {selected_labels} valid audiences: {classifier_labels}", status=200)
+            return response
+        docvec_indices = set([classifier_labels.index(label) for label in selected_labels])
+        # print(f"Selected labels: {selected_labels} Indices: {docvec_indices}")
+        filtered = []
+        for article in db.query("select distinct on (title) name, loc, title, description, url, published_at, image_url, content, docvec_v2, audience, prediction from articles_v2 where docvec_v2 is not null;"):
+            if article['audience'] in transtable and transtable[article['audience']] in selected_labels:
+                article['docvec_v2'] = dict(zip(classifier_labels, article['docvec_v2']))
+                filtered.append(article)
+
+        results = list(sorted(filtered, key=sort_function(docvec_indices), reverse=True))[0:max(len(filtered), kwargs['_limit'])]
+        cache[str(kwargs)] = (time.time() + 3600, results)
+        # print(f"Ordered: {ordered}")
+    response = app.response_class(
+        response = json.dumps({"results": results}, indent=4, default=lambda x: x if not isinstance(x, datetime.datetime) else x.isoformat()),
+        status = 200,
+        mimetype='application/json')
+    print(response)
+    return response
+
+
+
 app.run(host='0.0.0.0', port=8888)
 
