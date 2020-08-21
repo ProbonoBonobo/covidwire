@@ -7,6 +7,7 @@ from dash.dependencies import Input, Output, State
 import flask
 import time
 import requests
+import plotly.graph_objects as go
 
 server = flask.Flask(__name__)  # define flask app.server
 server.suppress_callback_exceptions = True
@@ -372,7 +373,7 @@ def render_page_content(pathname, n_clicks, audience_filters):
     _kwargs = {}
     if audience_filters:
         _kwargs["audience"] = ','.join(audience_filters)
-    res = requests.get("http://localhost:8888/classified", params=_kwargs)
+    res = requests.get("https://kevinzeidler.com/api/classified", params=_kwargs)
     headline = "Error"
     image_url = ""
     description = ""
