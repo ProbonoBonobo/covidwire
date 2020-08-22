@@ -93,6 +93,7 @@ def get_classifier_predictions():
               "p": 0}
     def ambiguousness(indices):
         def inner(row):
+            print(f"Sorting by ambiguity...")
             vec = row['docvec_v2']
             ordered = list(sorted([(v, index) for index, v in enumerate(vec)], reverse=True))
             _max, _maxindex = ordered[0]
