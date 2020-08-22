@@ -89,7 +89,8 @@ def get_classifier_predictions():
 
     kwargs = {"audience": "local,regional,state,national,international,indefinite",
               "sortOrder": "ambiguity",
-              "_limit": 50}
+              "_limit": 50,
+              "p": 0}
     def ambiguousness(indices):
         def inner(row):
             vec = row['docvec_v2']
@@ -114,9 +115,10 @@ def get_classifier_predictions():
     kwargs.update(_kwargs)
     print(kwargs)
     keys = {"ambiguity": ambiguousness, "gradient descent": gradient}
+    serialized_kwargs = str({k:v for k,v in kwargs.items() if k not in ('p',)})
     sort_function = keys[kwargs['sortOrder']]
-    if str(kwargs) in cache and cache[str(kwargs)][0] > time.time():
-        results = cache[str(kwargs)][1]
+    if serialized_kwargs in cache and cache[serialized_kwargs][0] > time.time():
+        results = cache[serialized_kwargs][1]
     else:
         selected_labels = set(kwargs['audience'].split(","))
         if not all(label in classifier_labels for label in selected_labels):
@@ -131,8 +133,9 @@ def get_classifier_predictions():
                 filtered.append(article)
 
         results = list(sorted(filtered, key=sort_function(docvec_indices), reverse=True))[0:max(len(filtered), kwargs['_limit'])]
-        cache[str(kwargs)] = (time.time() + 3600, results)
+        cache[serialized_kwargs] = (time.time() + 3600, results)
         # print(f"Ordered: {ordered}")
+    results = results[int(kwargs['p'])]
     response = app.response_class(
         response = json.dumps({"results": results}, indent=4, default=lambda x: x if not isinstance(x, datetime.datetime) else x.isoformat()),
         status = 200,
@@ -141,6 +144,6 @@ def get_classifier_predictions():
     return response
 
 
-
-app.run(host='0.0.0.0', port=8888)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8888)
 

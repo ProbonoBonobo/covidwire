@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 
 server = flask.Flask(__name__)  # define flask app.server
 server.suppress_callback_exceptions = True
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY], server=server, assets_folder='assets')
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY], server=server, assets_folder='assets', assets_external_path= '')
 server = app.server
 print(app.server)
 app.suppress_callback_exceptions = True
@@ -370,7 +370,7 @@ def toggle_active_links(pathname):
 def render_page_content(pathname, n_clicks, audience_filters):
     # n_clicks = n_clicks if n_clicks else 0
     print(audience_filters)
-    _kwargs = {}
+    _kwargs = {'p': n_clicks}
     if audience_filters:
         _kwargs["audience"] = ','.join(audience_filters)
     res = requests.get("https://kevinzeidler.com/api/classified", params=_kwargs)
@@ -515,9 +515,9 @@ server.suppress_callback_exceptions = True
 if __name__ == "__main__":
     app.run_server(
         port=8000,
-        debug=True,
-        dev_tools_hot_reload=True,
-        dev_tools_hot_reload_interval=1000,
-        dev_tools_hot_reload_watch_interval=1000,
+        # debug=True,
+        # dev_tools_hot_reload=True,
+        # dev_tools_hot_reload_interval=1000,
+        # dev_tools_hot_reload_watch_interval=1000,
     )
 # get_predictions("Dear Golden,\n\nMy name is Kevin Zeidler and I am")
