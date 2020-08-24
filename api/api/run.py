@@ -122,6 +122,7 @@ def get_classifier_predictions():
     kwargs = {"audience": "local,regional,state,national,international,indefinite",
               "auth": "",
               "_limit": 50,
+
               "p": 0}
     passwords = defaultdict(lambda x: "CovidWire2020")
     def ambiguousness(indices):
