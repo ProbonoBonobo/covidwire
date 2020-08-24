@@ -168,7 +168,7 @@ sentencizer = nlp.create_pipe("sentencizer")
 nlp.add_pipe(sentencizer)
 
 
-def render_content(headline="None", image_url="localhost:8000/404.png", publication="", description="", content="", audience_filters=['local']):
+def render_content(headline="None", image_url="localhost:8000/404.png", publication="", description="", content="", audience_filters=['local'], reviewer_name='Kevin'):
     content = html.Div(
         children=daq.DarkThemeProvider(
             theme=theme,
@@ -232,21 +232,14 @@ def render_content(headline="None", image_url="localhost:8000/404.png", publicat
                                                     # dbc.FormGroup(
                                                     #     [
                                                     dbc.Col(
-                                                        dbc.Label("Order by"), width=1
+                                                        dbc.Label("Password:"), width=1
                                                     ),
                                                     dbc.Col(
-                                                        dcc.Dropdown(
-                                                            options=[
-                                                                {
-                                                                    "label": "gradient descent",
-                                                                    "value": "gradient descent",
-                                                                },
-                                                                {
-                                                                    "label": "ambiguity",
-                                                                    "value": "ambiguity",
-                                                                },
-                                                            ],
-                                                            id='sort-order'
+                                                        dbc.Input(
+                                                            placeholder='Enter password here',
+                                                            value='',
+                                                            type='password',
+                                                            id='auth'
                                                         ),
                                                         width=4,
                                                     ),
@@ -365,14 +358,15 @@ def toggle_active_links(pathname):
 
 @app.callback(
     [Output("page-content", "children"), Output("audience-prediction", "children"), Output('approval-matrix', 'children')],
-    [Input("url", "pathname"), Input("submit", "n_clicks"), Input('audience-filters', 'value')],
+    [Input("url", "pathname"), Input("submit", "n_clicks"), Input('audience-filters', 'value'), Input('auth', 'value')],
 )
-def render_page_content(pathname, n_clicks, audience_filters):
+def render_page_content(pathname, n_clicks, audience_filters, auth):
     # n_clicks = n_clicks if n_clicks else 0
     print(audience_filters)
     _kwargs = {'p': n_clicks}
     if audience_filters:
         _kwargs["audience"] = ','.join(audience_filters)
+    _kwargs['auth'] = auth
     res = requests.get("https://kevinzeidler.com/api/classified", params=_kwargs)
     headline = "Error"
     image_url = ""
@@ -386,7 +380,7 @@ def render_page_content(pathname, n_clicks, audience_filters):
         print(f"Results received.")
 
         results = data["results"]
-        nxt = results[n_clicks]
+        nxt = results
         headline = nxt["title"]
         image_url = nxt["image_url"]
         description = nxt['description']
@@ -394,7 +388,7 @@ def render_page_content(pathname, n_clicks, audience_filters):
         content = nxt['content']
         docvec = nxt['docvec_v2']
     if pathname in ["/", "/page-1"]:
-        body = render_content(headline, image_url, publication, description, content, audience_filters)
+        body = render_content(headline, image_url, publication, description, content, audience_filters, auth)
 
         approval_vals = [docvec["rejected"], docvec['approved']]
         audience_preds = [docvec['local'], docvec['regional'], docvec['state'], docvec['national'], docvec['international'], docvec['unbound']]

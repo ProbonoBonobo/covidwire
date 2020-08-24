@@ -98,18 +98,20 @@ def classification_perplexity(row):
 
 def sort_articles_by_approval_perplexity():
     candidates = []
-    for row in db['articles_v2']:
-        if row['docvec_v2']:
-            candidates.append(row)
-    return list(sorted(candidates, key=approval_perplexity))
+    for row in articles:
+        candidates.append({k: v for k, v in row.items() if k in (
+        'title', 'description', 'content', 'name', 'published_at', 'docvec_v2', 'prediction', 'audience', 'loc',
+        'image_url')})
+    return deque(sorted(candidates, key=approval_perplexity))
 def sort_articles_by_classification_perplexity():
     candidates = []
-    for row in db['articles_v2']:
-        if row['docvec_v2']:
-            candidates.append(row)
-    return list(sorted(candidates, key=classification_perplexity))
+    for row in articles:
+        candidates.append({k: v for k, v in row.items() if k in (
+        'title', 'description', 'content', 'name', 'published_at', 'docvec_v2', 'prediction', 'audience', 'loc',
+        'image_url')})
+    return deque(sorted(candidates, key=classification_perplexity))
 
-
+from collections import defaultdict
 @app.route('/classified', methods=['GET'])
 def get_classifier_predictions():
     actual_labels = ("approved", "rejected", "international", "city", "regional", "national", "indefinite", "state")
@@ -118,9 +120,10 @@ def get_classifier_predictions():
     # ip_addr = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
 
     kwargs = {"audience": "local,regional,state,national,international,indefinite",
-              "sortOrder": "ambiguity",
+              "auth": "",
               "_limit": 50,
               "p": 0}
+    passwords = defaultdict(lambda x: "CovidWire2020")
     def ambiguousness(indices):
         def inner(row):
             print(f"Sorting by ambiguity...")
@@ -144,6 +147,10 @@ def get_classifier_predictions():
 
     _kwargs = {k: urldecode(v) for k, v in request.args.items()} or {}
     kwargs.update(_kwargs)
+    if not passwords[kwargs['reviewer_id']] == kwargs['password']:
+        response = app.response_class(
+            response=f"invalid password", status=403)
+        return response
     print(kwargs)
     keys = {"ambiguity": ambiguousness, "gradient descent": gradient}
     serialized_kwargs = str({k:v for k,v in kwargs.items() if k not in ('p',)})
@@ -153,7 +160,7 @@ def get_classifier_predictions():
     else:
         selected_labels = set(kwargs['audience'].split(","))
         if not all(label in classifier_labels for label in selected_labels):
-            response = app.response_class( response = "invalid audience: {selected_labels} valid audiences: {classifier_labels}", status=200)
+            response = app.response_class( response = f"invalid audience: {selected_labels} valid audiences: {classifier_labels}", status=200)
             return response
         docvec_indices = set([classifier_labels.index(label) for label in selected_labels])
         # print(f"Selected labels: {selected_labels} Indices: {docvec_indices}")
@@ -162,14 +169,10 @@ def get_classifier_predictions():
             if article['audience'] in transtable and transtable[article['audience']] in selected_labels:
                 article['docvec_v2'] = dict(zip(classifier_labels, article['docvec_v2']))
                 results.append({k:v for k,v in article.items() if k in ('title', 'description', 'content', 'name', 'published_at', 'docvec_v2', 'prediction', 'audience', 'loc', 'image_url')})
-
-        # results = list(sorted(filtered, key=lambda row: abs(row['docvec_v2']['approved'] - row['docvec_v2']['rejected'])))
         cache[serialized_kwargs] = (time.time() + 3600, results)
-        # print(f"Ordered: {ordered}")
-    results = results[int(kwargs['p'])]
-
+    result = results[int(kwargs['p'])]
     response = app.response_class(
-        response = json.dumps({"results": results}, indent=4, default=lambda x: x if not isinstance(x, datetime.datetime) else x.isoformat()),
+        response = json.dumps({"results": result}, indent=4, default=lambda x: x if not isinstance(x, datetime.datetime) else x.isoformat()),
         status = 200,
         mimetype='application/json')
     print(response)
