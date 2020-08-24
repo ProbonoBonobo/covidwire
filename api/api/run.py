@@ -163,7 +163,9 @@ def get_classifier_predictions():
     keys = {"ambiguity": ambiguousness, "gradient descent": gradient}
     serialized_kwargs = str({k:v for k,v in kwargs.items() if k in ("audience",)})
     kwargs['hash'] = serialized_kwargs.__hash__()
-    row = {"url": kwargs['url'], 'hash': kwargs['hash'], 'title': kwargs['title'], 'description': kwargs['description'], 'content': kwargs['content'], 'name': kwargs['name'], 'quality_score': kwargs['quality_score'], "audience_label": kwargs['audience_label']}
+    row = {"url": kwargs['url'], 'filterid': kwargs['hash'], 'title': kwargs['title'], 'description': kwargs['description'], 'content': kwargs['content'], 'name': kwargs['name'], 'quality_score': kwargs['quality_score'], "audience_label": kwargs['audience_label']}
+    if row['url'] and row['quality_score'] and row['audience_label']:
+        db['labeled_articles'].upsert(row, ['url'])
     # sort_function = keys[kwargs['sortOrder']]
     if serialized_kwargs in cache and cache[serialized_kwargs][0] > time.time():
         results = cache[serialized_kwargs][1]
@@ -181,7 +183,7 @@ def get_classifier_predictions():
                 results.append({k:v for k,v in article.items() if k in ('title', 'description', 'content', 'name', 'published_at', 'docvec_v2', 'prediction', 'audience', 'loc', 'image_url', "url")})
         cache[serialized_kwargs] = (time.time() + 3600, results)
     index = list(db.query("select count(*) from labeled_articles;"))[0]
-    result = results[db['labeled_articles'].count()]
+    result = results[db['labeled_articles'].count(filterid=row['filterid'])]
     response = app.response_class(
         response = json.dumps({"results": result}, indent=4, default=lambda x: x if not isinstance(x, datetime.datetime) else x.isoformat()),
         status = 200,
