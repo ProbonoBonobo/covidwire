@@ -101,14 +101,14 @@ def sort_articles_by_approval_perplexity():
     for row in articles:
         candidates.append({k: v for k, v in row.items() if k in (
         'title', 'description', 'content', 'name', 'published_at', 'docvec_v2', 'prediction', 'audience', 'loc',
-        'image_url')})
+        'image_url', "url")})
     return deque(sorted(candidates, key=approval_perplexity))
 def sort_articles_by_classification_perplexity():
     candidates = []
     for row in articles:
         candidates.append({k: v for k, v in row.items() if k in (
         'title', 'description', 'content', 'name', 'published_at', 'docvec_v2', 'prediction', 'audience', 'loc',
-        'image_url')})
+        'image_url', "url")})
     return deque(sorted(candidates, key=classification_perplexity))
 import os
 from collections import defaultdict
@@ -191,5 +191,5 @@ def get_classifier_predictions():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8888)
+    app.run(host='0.0.0.0', port=8888 )
 
