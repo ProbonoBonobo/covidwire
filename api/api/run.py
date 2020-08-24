@@ -133,7 +133,7 @@ def get_classifier_predictions():
                 article['docvec_v2'] = dict(zip(classifier_labels, article['docvec_v2']))
                 filtered.append(article)
 
-        results = list(sorted(filtered, key=lambda row: abs(row['docvec_v2']['approved'] - row['docvec_v2']['rejected']), reverse=True))
+        results = list(sorted(filtered, key=lambda row: abs(row['docvec_v2']['approved'] - row['docvec_v2']['rejected'])))
         cache[serialized_kwargs] = (time.time() + 3600, results)
         # print(f"Ordered: {ordered}")
     results = results[int(kwargs['p'])]
