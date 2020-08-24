@@ -161,7 +161,7 @@ def get_classifier_predictions():
         return response
     print(kwargs)
     keys = {"ambiguity": ambiguousness, "gradient descent": gradient}
-    serialized_kwargs = str({k:v for k,v in kwargs.items() if k not in ('p',)})
+    serialized_kwargs = str({k:v for k,v in kwargs.items() if k in ("audience",)})
     kwargs['hash'] = serialized_kwargs.__hash__()
     row = {"url": kwargs['url'], 'hash': kwargs['hash'], 'title': kwargs['title'], 'description': kwargs['description'], 'content': kwargs['content'], 'name': kwargs['name'], 'quality_score': kwargs['quality_score'], "audience_label": kwargs['audience_label']}
     # sort_function = keys[kwargs['sortOrder']]
