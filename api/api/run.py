@@ -23,7 +23,7 @@ app.config['CORS_HEADERS'] = 'Content-Type'
 app.config["DEBUG"] = True
 cols = ("approved", "rejected", "international", "local", "regional", "national", "unbound", "state")
 candidates = []
-for row in articles:
+for row in db['articles_v2']:
     if row['docvec_v2']:
         candidates.append(row)
 
