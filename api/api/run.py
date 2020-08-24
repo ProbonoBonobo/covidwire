@@ -103,6 +103,7 @@ def get_classifier_predictions():
     actual_labels = ("approved", "rejected", "international", "city", "regional", "national", "indefinite", "state")
     classifier_labels = ("approved", "rejected", "international", "local", "regional", "national", "unbound", "state")
     transtable = dict(zip(actual_labels, classifier_labels))
+    ip_addr = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
 
     kwargs = {"audience": "local,regional,state,national,international,indefinite",
               "sortOrder": "ambiguity",
@@ -154,6 +155,7 @@ def get_classifier_predictions():
         cache[serialized_kwargs] = (time.time() + 3600, results)
         # print(f"Ordered: {ordered}")
     results = results[int(kwargs['p'])]
+    results['ip'] = ip_addr
     response = app.response_class(
         response = json.dumps({"results": results}, indent=4, default=lambda x: x if not isinstance(x, datetime.datetime) else x.isoformat()),
         status = 200,
