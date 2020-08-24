@@ -154,6 +154,8 @@ def get_classifier_predictions():
     print(kwargs)
     keys = {"ambiguity": ambiguousness, "gradient descent": gradient}
     serialized_kwargs = str({k:v for k,v in kwargs.items() if k not in ('p',)})
+    kwargs['hash'] = serialized_kwargs.__hash__()
+    row = {"url": kwargs['url'], 'hash': kwargs['hash'], 'title': kwargs['title'], 'description': kwargs['description'], content=kwargs['content'], 'name': kwargs['name'], 'quality_score': kwargs['quality_score'], "audience_label": kwargs['audience_label']}
     # sort_function = keys[kwargs['sortOrder']]
     if serialized_kwargs in cache and cache[serialized_kwargs][0] > time.time():
         results = cache[serialized_kwargs][1]
