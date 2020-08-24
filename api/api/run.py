@@ -80,7 +80,7 @@ def get_scored_results():
     return response
     # return f"""<h1>Query Parameters:</h1><p>{formatted_args}</p>
     #                <h2>Results:</h2><div>{formatted_results}</div>"""
-
+from collections import deque
 @app.route('/classified', methods=['GET'])
 def get_classifier_predictions():
     actual_labels = ("approved", "rejected", "international", "city", "regional", "national", "indefinite", "state")
@@ -128,12 +128,12 @@ def get_classifier_predictions():
         docvec_indices = set([classifier_labels.index(label) for label in selected_labels])
         # print(f"Selected labels: {selected_labels} Indices: {docvec_indices}")
         filtered = []
-        for article in db.query("select distinct on (title) name, loc, title, description, url, published_at, image_url, content, docvec_v2, audience, prediction from articles_v2 where docvec_v2 is not null;"):
+        for article in db.query("select distinct on (title) name, loc, title, description, url, published_at, image_url, content, docvec_v2, audience, prediction from articles_v2;"):
             if article['audience'] in transtable and transtable[article['audience']] in selected_labels:
                 article['docvec_v2'] = dict(zip(classifier_labels, article['docvec_v2']))
                 filtered.append(article)
 
-        results = list(sorted(filtered, key=sort_function(docvec_indices), reverse=True))[0:max(len(filtered), kwargs['_limit'])]
+        results = list(sorted(filtered, key=lambda row: abs(row['docvec_v2']['approved'] - row['docvec_v2']['rejected']), reverse=True))
         cache[serialized_kwargs] = (time.time() + 3600, results)
         # print(f"Ordered: {ordered}")
     results = results[int(kwargs['p'])]
