@@ -22,10 +22,7 @@ cors = CORS(app)
 app.config['CORS_HEADERS'] = 'Content-Type'
 app.config["DEBUG"] = True
 cols = ("approved", "rejected", "international", "local", "regional", "national", "unbound", "state")
-candidates = []
-for row in db['articles_v2']:
-    if row['docvec_v2']:
-        candidates.append(row)
+
 
 @app.route('/', methods=['GET'])
 def home():
@@ -86,11 +83,18 @@ def get_scored_results():
     #                <h2>Results:</h2><div>{formatted_results}</div>"""
 from collections import deque
 def classification_perplexity(row):
+    if not row['docvec_v2'] or isinstance(row['docvec_v2'], dict):
+        print(f"Bad row: {row['title'], row['docvec_v2']}")
+        return 9999
     sorted_vals = list(sorted(row['docvec_v2'][2:], reverse=True))
     top, runner_up = sorted_vals[:2]
     return abs(top - runner_up)
 
 def sort_articles_by_classification_perplexity():
+    candidates = []
+    for row in db['articles_v2']:
+        if row['docvec_v2']:
+            candidates.append(row)
     return list(sorted(candidates, key=classification_perplexity))
 
 
@@ -140,13 +144,13 @@ def get_classifier_predictions():
             return response
         docvec_indices = set([classifier_labels.index(label) for label in selected_labels])
         # print(f"Selected labels: {selected_labels} Indices: {docvec_indices}")
-        filtered = []
+        results = []
         for article in sort_articles_by_classification_perplexity():
             if article['audience'] in transtable and transtable[article['audience']] in selected_labels:
                 article['docvec_v2'] = dict(zip(classifier_labels, article['docvec_v2']))
-                filtered.append(article)
+                results.append(article)
 
-        results = list(sorted(filtered, key=lambda row: abs(row['docvec_v2']['approved'] - row['docvec_v2']['rejected'])))
+        # results = list(sorted(filtered, key=lambda row: abs(row['docvec_v2']['approved'] - row['docvec_v2']['rejected'])))
         cache[serialized_kwargs] = (time.time() + 3600, results)
         # print(f"Ordered: {ordered}")
     results = results[int(kwargs['p'])]
