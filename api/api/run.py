@@ -21,7 +21,11 @@ app = flask.Flask(__name__)
 cors = CORS(app)
 app.config['CORS_HEADERS'] = 'Content-Type'
 app.config["DEBUG"] = True
-
+cols = ("approved", "rejected", "international", "local", "regional", "national", "unbound", "state")
+candidates = []
+for row in articles:
+    if row['docvec_v2']:
+        candidates.append(row)
 
 @app.route('/', methods=['GET'])
 def home():
@@ -81,6 +85,15 @@ def get_scored_results():
     # return f"""<h1>Query Parameters:</h1><p>{formatted_args}</p>
     #                <h2>Results:</h2><div>{formatted_results}</div>"""
 from collections import deque
+def classification_perplexity(row):
+    sorted_vals = list(sorted(row['docvec_v2'][2:], reverse=True))
+    top, runner_up = sorted_vals[:2]
+    return abs(top - runner_up)
+
+def sort_articles_by_classification_perplexity():
+    return list(sorted(candidates, key=classification_perplexity))
+
+
 @app.route('/classified', methods=['GET'])
 def get_classifier_predictions():
     actual_labels = ("approved", "rejected", "international", "city", "regional", "national", "indefinite", "state")
@@ -128,7 +141,7 @@ def get_classifier_predictions():
         docvec_indices = set([classifier_labels.index(label) for label in selected_labels])
         # print(f"Selected labels: {selected_labels} Indices: {docvec_indices}")
         filtered = []
-        for article in db.query("select distinct on (title) name, loc, title, description, url, published_at, image_url, content, docvec_v2, audience, prediction from articles_v2;"):
+        for article in sort_articles_by_classification_perplexity():
             if article['audience'] in transtable and transtable[article['audience']] in selected_labels:
                 article['docvec_v2'] = dict(zip(classifier_labels, article['docvec_v2']))
                 filtered.append(article)
