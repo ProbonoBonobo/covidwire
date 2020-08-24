@@ -82,6 +82,12 @@ def get_scored_results():
     # return f"""<h1>Query Parameters:</h1><p>{formatted_args}</p>
     #                <h2>Results:</h2><div>{formatted_results}</div>"""
 from collections import deque
+def approval_perplexity(row):
+    if not row['docvec_v2'] or isinstance(row['docvec_v2'], dict):
+        print(f"Bad row: {row['title'], row['docvec_v2']}")
+        return 9999
+    return abs(row['docvec_v2'][0] - row['docvec_v2'][1])
+
 def classification_perplexity(row):
     if not row['docvec_v2'] or isinstance(row['docvec_v2'], dict):
         print(f"Bad row: {row['title'], row['docvec_v2']}")
@@ -90,6 +96,12 @@ def classification_perplexity(row):
     top, runner_up = sorted_vals[:2]
     return abs(top - runner_up)
 
+def sort_articles_by_approval_perplexity():
+    candidates = []
+    for row in db['articles_v2']:
+        if row['docvec_v2']:
+            candidates.append(row)
+    return list(sorted(candidates, key=approval_perplexity))
 def sort_articles_by_classification_perplexity():
     candidates = []
     for row in db['articles_v2']:
@@ -146,7 +158,7 @@ def get_classifier_predictions():
         docvec_indices = set([classifier_labels.index(label) for label in selected_labels])
         # print(f"Selected labels: {selected_labels} Indices: {docvec_indices}")
         results = []
-        for article in sort_articles_by_classification_perplexity():
+        for article in sort_articles_by_approval_perplexity():
             if article['audience'] in transtable and transtable[article['audience']] in selected_labels:
                 article['docvec_v2'] = dict(zip(classifier_labels, article['docvec_v2']))
                 results.append({k:v for k,v in article.items() if k in ('title', 'description', 'content', 'name', 'published_at', 'docvec_v2', 'prediction', 'audience', 'loc', 'image_url')})
@@ -155,7 +167,7 @@ def get_classifier_predictions():
         cache[serialized_kwargs] = (time.time() + 3600, results)
         # print(f"Ordered: {ordered}")
     results = results[int(kwargs['p'])]
-    
+
     response = app.response_class(
         response = json.dumps({"results": results}, indent=4, default=lambda x: x if not isinstance(x, datetime.datetime) else x.isoformat()),
         status = 200,
