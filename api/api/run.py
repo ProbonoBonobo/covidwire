@@ -178,7 +178,7 @@ def get_classifier_predictions():
         for article in sort_articles_by_approval_perplexity():
             if article['audience'] in transtable and transtable[article['audience']] in selected_labels:
                 article['docvec_v2'] = dict(zip(classifier_labels, article['docvec_v2']))
-                results.append({k:v for k,v in article.items() if k in ('title', 'description', 'content', 'name', 'published_at', 'docvec_v2', 'prediction', 'audience', 'loc', 'image_url')})
+                results.append({k:v for k,v in article.items() if k in ('title', 'description', 'content', 'name', 'published_at', 'docvec_v2', 'prediction', 'audience', 'loc', 'image_url', "url")})
         cache[serialized_kwargs] = (time.time() + 3600, results)
     index = list(db.query("select count(*) from labeled_articles;"))[0]
     result = results[db['labeled_articles'].count()]
