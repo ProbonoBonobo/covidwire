@@ -103,7 +103,7 @@ def get_classifier_predictions():
     actual_labels = ("approved", "rejected", "international", "city", "regional", "national", "indefinite", "state")
     classifier_labels = ("approved", "rejected", "international", "local", "regional", "national", "unbound", "state")
     transtable = dict(zip(actual_labels, classifier_labels))
-    ip_addr = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
+    # ip_addr = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
 
     kwargs = {"audience": "local,regional,state,national,international,indefinite",
               "sortOrder": "ambiguity",
@@ -149,13 +149,13 @@ def get_classifier_predictions():
         for article in sort_articles_by_classification_perplexity():
             if article['audience'] in transtable and transtable[article['audience']] in selected_labels:
                 article['docvec_v2'] = dict(zip(classifier_labels, article['docvec_v2']))
-                results.append(article)
+                results.append({k:v for k,v in article.items() if k in ('title', 'description', 'content', 'name', 'published_at', 'docvec_v2', 'prediction', 'audience', 'loc', 'image_url')})
 
         # results = list(sorted(filtered, key=lambda row: abs(row['docvec_v2']['approved'] - row['docvec_v2']['rejected'])))
         cache[serialized_kwargs] = (time.time() + 3600, results)
         # print(f"Ordered: {ordered}")
     results = results[int(kwargs['p'])]
-    results['ip'] = ip_addr
+    
     response = app.response_class(
         response = json.dumps({"results": results}, indent=4, default=lambda x: x if not isinstance(x, datetime.datetime) else x.isoformat()),
         status = 200,
