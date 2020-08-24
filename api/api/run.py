@@ -170,7 +170,7 @@ def get_classifier_predictions():
                 article['docvec_v2'] = dict(zip(classifier_labels, article['docvec_v2']))
                 results.append({k:v for k,v in article.items() if k in ('title', 'description', 'content', 'name', 'published_at', 'docvec_v2', 'prediction', 'audience', 'loc', 'image_url')})
         cache[serialized_kwargs] = (time.time() + 3600, results)
-    index = db.query("select count(*) from labeled_articles;")[0]
+    index = list(db.query("select count(*) from labeled_articles;"))[0]
     result = results[int(index)]
     response = app.response_class(
         response = json.dumps({"results": result}, indent=4, default=lambda x: x if not isinstance(x, datetime.datetime) else x.isoformat()),
