@@ -84,13 +84,13 @@ def get_scored_results():
 from collections import deque
 def approval_perplexity(row):
     if not row['docvec_v2'] or isinstance(row['docvec_v2'], dict):
-        print(f"Bad row: {row['title'], row['docvec_v2']}")
+        # print(f"Bad row: {row['title'], row['docvec_v2']}")
         return 9999
     return abs(row['docvec_v2'][0] - row['docvec_v2'][1])
 
 def classification_perplexity(row):
     if not row['docvec_v2'] or isinstance(row['docvec_v2'], dict):
-        print(f"Bad row: {row['title'], row['docvec_v2']}")
+        # print(f"Bad row: {row['title'], row['docvec_v2']}")
         return 9999
     sorted_vals = list(sorted(row['docvec_v2'][2:], reverse=True))
     top, runner_up = sorted_vals[:2]
@@ -163,7 +163,7 @@ def get_classifier_predictions():
     keys = {"ambiguity": ambiguousness, "gradient descent": gradient}
     serialized_kwargs = str({k:v for k,v in kwargs.items() if k in ("audience",)})
     kwargs['hash'] = serialized_kwargs.__hash__()
-    row = {"url": kwargs['url'], 'filterid': kwargs['hash'], 'title': kwargs['title'], 'description': kwargs['description'], 'content': kwargs['content'], 'name': kwargs['name'], 'quality_score': kwargs['quality_score'], "audience_label": kwargs['audience_label']}
+    row = {"url": kwargs['url'], 'filterid': str(kwargs['hash']), 'title': kwargs['title'], 'description': kwargs['description'], 'content': kwargs['content'], 'name': kwargs['name'], 'quality_score': kwargs['quality_score'], "audience_label": kwargs['audience_label']}
     if row['url'] and row['quality_score'] and row['audience_label']:
         db['labeled_articles'].upsert(row, ['url'])
     # sort_function = keys[kwargs['sortOrder']]
