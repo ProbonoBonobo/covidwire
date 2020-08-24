@@ -122,6 +122,13 @@ def get_classifier_predictions():
     kwargs = {"audience": "local,regional,state,national,international,indefinite",
               "auth": "",
               "_limit": 50,
+              "quality_score": None,
+              "audience_label": None,
+              "url": None,
+              "title": None,
+              "description": None,
+              "content": None,
+              "name": None,
 
               "p": 0}
     passwords = defaultdict(lambda x: "CovidWire2020")
