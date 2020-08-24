@@ -110,7 +110,7 @@ def sort_articles_by_classification_perplexity():
         'title', 'description', 'content', 'name', 'published_at', 'docvec_v2', 'prediction', 'audience', 'loc',
         'image_url')})
     return deque(sorted(candidates, key=classification_perplexity))
-
+import os
 from collections import defaultdict
 @app.route('/classified', methods=['GET'])
 def get_classifier_predictions():
@@ -147,7 +147,7 @@ def get_classifier_predictions():
 
     _kwargs = {k: urldecode(v) for k, v in request.args.items()} or {}
     kwargs.update(_kwargs)
-    if not passwords[kwargs['reviewer_id']] == kwargs['password']:
+    if not kwargs['password'] == os.environ.get("DAQ_AUTH_TOKEN", "CovidWire2020"):
         response = app.response_class(
             response=f"invalid password", status=403)
         return response
