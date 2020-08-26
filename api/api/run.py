@@ -226,7 +226,7 @@ def get_classifier_predictions():
                 if random.random() < 0.1:
                     docvec = eval("[" + row['docvec_v2'][1:-1] + "]")
                     print(f"Docvec is: {docvec}")
-                    row['docvec_v2'] = dict(zip(classifier_labels,))
+                    row['docvec_v2'] = dict(zip(classifier_labels,docvec))
                     print(json.dumps(row['docvec_v2']))
                     results.append(row)
 
