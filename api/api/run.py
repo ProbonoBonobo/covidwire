@@ -195,7 +195,9 @@ def get_classifier_predictions():
         row = {k: kwargs[k] for k in cols}
         row['filterid'] =  serialized_kwargs.__hash__()
         row['hidden_weights'] = kwargs['hidden_weights']
-        if row['url'] and row['quality_score'] and row['audience_label']:
+
+        if row['url'] and row['quality_score'] is not None and row['audience_label']:
+            print(f"Inserting {row}")
             db['labeled_articles'].upsert(row, ['url'])
     elif action == 'undo' and kwargs['history']:
         print(f"History: {kwargs['history']}")
