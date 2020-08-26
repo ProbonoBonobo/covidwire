@@ -8,6 +8,7 @@ import dataset
 import json
 import time
 import html
+
 from urllib.parse import unquote_plus as urldecode
 cache = {}
 TABLE = "articles_v2"
@@ -111,6 +112,7 @@ def sort_articles_by_classification_perplexity():
         'image_url', "url")})
     return deque(sorted(candidates, key=classification_perplexity))
 import os
+import base64
 from collections import defaultdict
 @app.route('/classified', methods=['GET'])
 def get_classifier_predictions():
@@ -129,7 +131,10 @@ def get_classifier_predictions():
               "description": None,
               "content": None,
               "name": None,
-
+              "time_sensitivity": None,
+              "feature_worthy": None,
+              "sports_related": None,
+              "problematic": None,
               "p": 0}
     passwords = defaultdict(lambda x: "CovidWire2020")
     def ambiguousness(indices):
@@ -151,6 +156,11 @@ def get_classifier_predictions():
             print(_max)
             return _max
         return inner
+    if not 'payload' in request.args:
+        return app.response_class(
+            response="", status=403)
+    payload = request.args['payload']
+    _kwargs = base64.decodestring(payload.encode('utf-8'))
 
 
     _kwargs = {k: urldecode(v) for k, v in request.args.items()} or {}

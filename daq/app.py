@@ -2,18 +2,34 @@ import dash
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
+import base64
 import dash_daq as daq
 from dash.dependencies import Input, Output, State
 import flask
 import time
 import requests
 import plotly.graph_objects as go
+import dash_auth
 
-server = flask.Flask(__name__)  # define flask app.server
-server.suppress_callback_exceptions = True
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY], server=server, assets_folder='assets', assets_external_path= '')
+VALID_USERNAME_PASSWORD_PAIRS = {
+    "jeff": "CovidWire2020",
+    "tom": "CovidWire2020",
+    "kevin": "CovidWire2020",
+    "loree": "CovidWire2020",
+    "mason": "CovidWire2020"
+}
+#server = flask.Flask(__name__)  # define flask app.server
+#server.suppress_callback_exceptions = True
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY], assets_folder='assets', assets_external_path= '')
+
+auth = dash_auth.BasicAuth(
+    app,
+    VALID_USERNAME_PASSWORD_PAIRS
+
+)
 server = app.server
-print(app.server)
+
+
 app.suppress_callback_exceptions = True
 print(dir(dbc.themes.BOOTSTRAP), type(dbc.themes.DARKLY))
 print("theme", dbc.themes.BOOTSTRAP)
@@ -59,25 +75,81 @@ theme = {"dark": True, "primary": "#6DD6DA", "detail": "#95D9DA", "accent": "#f8
 
 input_group = [dbc.FormGroup(
                 [
-                    dbc.Label("Quality score:"),
-                    dbc.Input(placeholder='Enter a number between 1-5', type='number', autoFocus=True, autoComplete=True)
+                    dbc.Label(html.H3("COVID Relevance")),
+                    #dbc.Input(placeholder='Enter a number between 1-5', type='number', autoFocus=True, autoComplete=True, id='quality-score')
+                    dbc.RadioItems(
+                        options=[
+                            {"label": "Not at all relevant", "value": 1},
+                            {"label": "Indirectly relevant", "value": 2},
+                            {"label": "Directly relevant", "value": 3},
+                        ],
+                        labelStyle={"transform": "translateX(10px)", "margin-left": "20px", "color": "rgba(125, 139, 153, 1)", "transition": "all 0.2 ease-in", "font-weight": "200", "line-height": "1.61rem", "margin-bottom": "0.5rem", "font-size": "1.61rem"},
+                        #inputStyle={"background-color": "tomato", "border": "10px solid blue", "color": "chartreuse"},
+                        labelCheckedStyle={"font-weight": 900, "transform": "translate(0px 5px);", "color": "#fcfcfc"},
+                        id='quality-score')
                 ],
 
             ),
             dbc.FormGroup(
                 [
-                    dbc.Label("Audience:"),
+                    dbc.Label(html.H3("Time sensitivity")),
+                    #dbc.Input(placeholder='Enter a number between 1-5', type='number', autoFocus=True, autoComplete=True, id='quality-score')
+
                     dbc.RadioItems(
                         options=[
-                            {"label": "Local", "value": 1},
-                            {"label": "Regional", "value": 2},
-                            {"label": "State", "value": 3},
-                            {"label": "National", "value": 4},
-                            {"label": "International", "value": 5},
-                            {"label": "Unbound", "value": 6}
+                            {"label": "High (hide after 24 hours)", "value": "high"},
+                            {"label": "Average (show for a couple days)", "value": "medium"},
+                            {"label": "Low (show for the next 1-2 weeks)", "value": "low"},
+                            {"label": "N/A (this is evergreen content)", "value": "none"},
                         ],
                         value=1,
-                        id="radioitems-input",
+                        id="time-sensitivity",
+                        labelStyle={"transform": "translateX(10px)", "margin-left": "20px",
+                                    "color": "rgba(125, 139, 153, 1)", "transition": "all 0.2 ease-in",
+                                    "font-weight": "200", "line-height": "1.61rem", "margin-bottom": "0.5rem",
+                                    "font-size": "1.61rem"},
+                        # inputStyle={"background-color": "tomato", "border": "10px solid blue", "color": "chartreuse"},
+                        # inputStyle={"background-color": "tomato", "border": "10px solid blue", "color": "chartreuse"},
+                        labelCheckedStyle={"font-weight": 900, "transform": "translate(0px 5px);", "color": "#fcfcfc"},
+                    )]),
+
+            dbc.FormGroup(
+                [
+                    dbc.Label(html.H3("Audience")),
+                    dbc.RadioItems(
+                        options=[
+                            {"label": "Local", "value": "local"},
+                            {"label": "Regional", "value": "regional"},
+                            {"label": "State", "value": "state"},
+                            {"label": "National", "value": "national"},
+                            {"label": "International", "value": "international"},
+                            {"label": "Unbound", "value": "unbound"}
+                        ],
+                        value=1,
+                        id="audience-label",
+                        labelStyle={"transform": "translateX(10px)", "margin-left": "20px", "color": "rgba(125, 139, 153, 1)", "transition": "all 0.2 ease-in", "font-weight": "200", "line-height": "1.61rem", "margin-bottom": "0.5rem", "font-size": "1.61rem"},
+                        #inputStyle={"background-color": "tomato", "border": "10px solid blue", "color": "chartreuse"},
+                        #inputStyle={"background-color": "tomato", "border": "10px solid blue", "color": "chartreuse"},
+                        labelCheckedStyle={"font-weight": 900, "transform": "translate(0px 5px);", "color": "#fcfcfc"},
+                    )]),
+            dbc.FormGroup(
+                [
+                    dbc.Label(html.H3("Is this article... ?")),
+                    dbc.Checklist(
+                        options=[
+                            {"label": "Feature-worthy", "value": "feature_worthy"},
+                            {"label": "Sports related", "value": "sports_related"},
+                            {"label": "Opinion/op-ed", "value": "opinion"},
+                            {"label": "Syndicated (e.g., Reuters, AP)", "value": "syndicated"},
+                            {"label": "Problematic", "value": "problematic"}
+                        ],
+                        switch=True,
+                        value=[],
+                        id="article-tags",
+                        labelStyle={"transform": "translateX(10px)", "margin-left": "20px", "color": "rgba(125, 139, 153, 1)", "transition": "all 0.2 ease-in", "font-weight": "200", "line-height": "1.61rem", "margin-bottom": "0.5rem", "font-size": "1.61rem"},
+                        #inputStyle={"background-color": "tomato", "border": "10px solid blue", "color": "chartreuse"},
+                        #inputStyle={"background-color": "tomato", "border": "10px solid blue", "color": "chartreuse"},
+                        labelCheckedStyle={"font-weight": 900, "transform": "translate(0px 5px);", "color": "#fcfcfc"},
                     )]),
     html.Div(
         dbc.Button("Next", color="primary", id="submit", n_clicks=0),
@@ -168,7 +240,7 @@ sentencizer = nlp.create_pipe("sentencizer")
 nlp.add_pipe(sentencizer)
 
 
-def render_content(headline="None", image_url="localhost:8000/404.png", publication="", description="", content="", audience_filters=['local'], reviewer_name='Kevin'):
+def render_content(headline="None", image_url="localhost:8000/404.png", publication="", description="", content="", audience_filters=['local'], auth="", url=""):
     content = html.Div(
         children=daq.DarkThemeProvider(
             theme=theme,
@@ -237,7 +309,7 @@ def render_content(headline="None", image_url="localhost:8000/404.png", publicat
                                                     dbc.Col(
                                                         dbc.Input(
                                                             placeholder='Enter password here',
-                                                            value='',
+                                                            value=auth,
                                                             type='password',
                                                             id='auth'
                                                         ),
@@ -302,7 +374,9 @@ def render_content(headline="None", image_url="localhost:8000/404.png", publicat
                                     )
                                 ],
                             style={'margin-top': '5vh'}),
-                            dbc.Row([dbc.Col(dbc.ListGroup([], id="suggestions"))]),
+                            dcc.Store(id='appstate',
+                                      data={"content": content, "title": headline, "description": description,
+                                            "url": url, "name": publication})
                         ]
                     ),
                 ]
@@ -354,25 +428,47 @@ def toggle_active_links(pathname):
         # Treat page 1 as the homepage / index
         return True, False, False
     return [pathname == f"/page-{i}" for i in range(1, 4)]
-
-
+import json
+from collections import defaultdict
 @app.callback(
     [Output("page-content", "children"), Output("audience-prediction", "children"), Output('approval-matrix', 'children')],
-    [Input("url", "pathname"), Input("submit", "n_clicks"), Input('audience-filters', 'value'), Input('auth', 'value')],
+    [Input("url", "pathname"), Input("submit", "n_clicks"), Input('audience-filters', 'value')],
+    [State('auth', 'value'), State('quality-score', 'value'), State('audience-label', 'value'), State('appstate', 'data'), State('article-tags', 'value')]
 )
-def render_page_content(pathname, n_clicks, audience_filters, auth):
+def render_page_content(pathname, n_clicks, audience_filters, auth, score, audience_label, appstate, tags):
     # n_clicks = n_clicks if n_clicks else 0
     print(audience_filters)
-    _kwargs = {'p': n_clicks}
+    print(appstate)
+    # appstate = defaultdict(lambda: "None", appstate)
+    _kwargs = {'p': n_clicks,
+               "quality_score": score,
+               "audience_label": audience_label,
+               "url": "",
+               "title": "",
+               "name": "",
+               "description": "",
+               "content": "",
+               "syndicated": 0,
+               "opinion": 0,
+               "feature_worthy": 0,
+               "time_sensitivity": 0,
+               "sports_related": 0,
+               "problematic": 0}
+    if appstate:
+        _kwargs.update({"url": appstate['url'], "title": appstate['title'], "name": appstate['name'], 'description': appstate['description'], "content": appstate['content']})
     if audience_filters:
         _kwargs["audience"] = ','.join(audience_filters)
+    tags = {tag: 1 for tag in tags}
+    _kwargs.update(tags)
     _kwargs['auth'] = auth
-    res = requests.get("https://kevinzeidler.com/api/classified", params=_kwargs)
-    headline = "Error"
+    payload = base64.encodestring(json.dumps(_kwargs).encode('utf-8')).decode("utf-8")
+    res = requests.get("https://kevinzeidler.com/api/classified", params={"payload": payload})
+    headline = ""
     image_url = ""
     description = ""
     publication = ""
     content = ""
+    url = ""
     docvec = {"approved": 0, "rejected": 0, "local": 0, "regional": 0, "state": 0, "national": 0, "international": 0, "unbound": 0}
     if res.ok:
         print(f"Fetching results...")
@@ -387,8 +483,10 @@ def render_page_content(pathname, n_clicks, audience_filters, auth):
         publication = nxt['name']
         content = nxt['content']
         docvec = nxt['docvec_v2']
+        url = nxt['url']
+
     if pathname in ["/", "/page-1"]:
-        body = render_content(headline, image_url, publication, description, content, audience_filters, auth)
+        body = render_content(headline, image_url, publication, description, content, audience_filters, auth, url)
 
         approval_vals = [docvec["rejected"], docvec['approved']]
         audience_preds = [docvec['local'], docvec['regional'], docvec['state'], docvec['national'], docvec['international'], docvec['unbound']]
@@ -509,7 +607,7 @@ server.suppress_callback_exceptions = True
 if __name__ == "__main__":
     app.run_server(
         port=8000,
-        # debug=True,
+        debug=True,
         # dev_tools_hot_reload=True,
         # dev_tools_hot_reload_interval=1000,
         # dev_tools_hot_reload_watch_interval=1000,
