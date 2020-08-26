@@ -163,7 +163,8 @@ def get_classifier_predictions():
     payload = unquote_plus(request.args['payload'])
     print(f"Payload: {payload}")
 
-    _kwargs = base64.decodestring(payload.encode('utf-8'))
+    _kwargs = base64.decodebytes(payload.encode('utf-8'))
+    print(_kwargs)
 
 
     _kwargs = {k: urldecode(v) for k, v in request.args.items()} or {}
