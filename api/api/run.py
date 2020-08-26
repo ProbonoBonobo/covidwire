@@ -112,6 +112,7 @@ def sort_articles_by_classification_perplexity():
         'image_url', "url")})
     return deque(sorted(candidates, key=classification_perplexity))
 import os
+from urllib.parse import unquote_plus
 import base64
 from collections import defaultdict
 @app.route('/classified', methods=['GET'])
@@ -159,7 +160,9 @@ def get_classifier_predictions():
     if not 'payload' in request.args:
         return app.response_class(
             response="", status=403)
-    payload = request.args['payload']
+    payload = unquote_plus(request.args['payload'])
+    print(f"Payload: {payload}")
+
     _kwargs = base64.decodestring(payload.encode('utf-8'))
 
 
