@@ -97,10 +97,10 @@ input_group = [dbc.FormGroup(
 
                     dbc.RadioItems(
                         options=[
-                            {"label": "High (hide after 24 hours)", "value": "high"},
-                            {"label": "Average (show for a couple days)", "value": "medium"},
-                            {"label": "Low (show for the next 1-2 weeks)", "value": "low"},
-                            {"label": "N/A (this is evergreen content)", "value": "none"},
+                            {"label": "High (hide after 24 hours)", "value": 3},
+                            {"label": "Average (show for a couple days)", "value": 2},
+                            {"label": "Low (show for the next 1-2 weeks)", "value": 1},
+                            {"label": "N/A (this is evergreen content)", "value": 0},
                         ],
                         value=1,
                         id="time-sensitivity",
@@ -394,7 +394,7 @@ app.layout = html.Div(
 
         right_sidebar,
         dcc.Store(id='appstate',
-                                      data={'history': []})
+                                      data={'history': [], 'hidden_weights': {}})
     ]
 )
 
@@ -434,9 +434,9 @@ from collections import defaultdict
 @app.callback(
     [Output("page-content", "children"), Output("audience-prediction", "children"), Output('approval-matrix', 'children'), Output('appstate', 'data')],
     [Input("url", "pathname"), Input("submit", "n_clicks"), Input("skip", "n_clicks"), Input("undo", "n_clicks"), Input('audience-filters', 'value')],
-    [State('auth', 'value'), State('quality-score', 'value'), State('audience-label', 'value'), State('appstate', 'data'), State('article-tags', 'value')]
+    [State('auth', 'value'), State('quality-score', 'value'), State('time-sensitivity', 'value'), State('audience-label', 'value'), State('appstate', 'data'), State('article-tags', 'value')]
 )
-def render_page_content(pathname, submit, skip, undo, audience_filters, auth, score, audience_label, appstate, tags):
+def render_page_content(pathname, submit, skip, undo, audience_filters, auth, score, time_sensitivity, audience_label, appstate, tags):
     ctx = dash.callback_context
 
     if not ctx.triggered:
@@ -458,14 +458,15 @@ def render_page_content(pathname, submit, skip, undo, audience_filters, auth, sc
                "name": "",
                "description": "",
                "content": "",
-               "syndicated": 0,
-               "opinion": 0,
-               "feature_worthy": 0,
-               "time_sensitivity": 0,
-               "sports_related": 0,
-               "problematic": 0}
+               "syndicated": int('syndicated' in tags),
+               "opinion": int('opinion' in tags),
+               "feature_worthy": int('feature_worthy' in tags),
+               "time_sensitivity": time_sensitivity,
+               "sports_related": int('sports_related' in tags),
+               "problematic": int('problematic' in tags),
+               "hidden_weights": appstate['hidden_weights']}
     if appstate and 'url' in appstate:
-        _kwargs.update({"url": appstate['url'], "title": appstate['title'], "name": appstate['name'], 'description': appstate['description'], "content": appstate['content']})
+        _kwargs.update({"url": appstate['url'], "title": appstate['title'], "name": appstate['name'], 'description': appstate['description'], "content": appstate['content'], "hidden_weights": appstate['hidden_weights']})
     if audience_filters:
         _kwargs["audience"] = ','.join(audience_filters)
     tags = {tag: 1 for tag in tags}
@@ -507,7 +508,8 @@ def render_page_content(pathname, submit, skip, undo, audience_filters, auth, sc
                     "title": headline,
                     "description": description,
                     "url": url,
-                    "name": publication})
+                    "name": publication,
+                    "hidden_weights": docvec})
         appstate['history'].append(url)
         print(audience_graph)
         return [body,audience_graph, approval_matrix, appstate]
