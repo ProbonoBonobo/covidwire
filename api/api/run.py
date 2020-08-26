@@ -163,7 +163,7 @@ def get_classifier_predictions():
     payload = unquote_plus(request.args['payload'])
     print(f"Payload: {payload}")
 
-    _kwargs = base64.decodebytes(payload.encode('utf-8'))
+    _kwargs = json.loads(base64.decodebytes(payload.encode('utf-8')).decode('utf-8'))
     print(_kwargs)
 
 
