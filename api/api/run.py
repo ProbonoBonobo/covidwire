@@ -199,7 +199,7 @@ def get_classifier_predictions():
     else:
         selected_labels = set(kwargs['audience'].split(","))
         seen = set([row['url'] for row in db.query("select url from labeled_articles")])
-        filtered = list([row for row in db.query("select distinct on (title) * from training_queue order by perplexity desc;") if row['url'] not in seen])
+        filtered = list([row for row in db.query("select distinct on (title, perplexity) * from training_queue order by perplexity desc;") if row['url'] not in seen])
         results = []
         if selected_labels:
             docvec_indices = set([classifier_labels.index(label) for label in selected_labels])
