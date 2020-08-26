@@ -199,6 +199,9 @@ def get_classifier_predictions():
         if row['url'] and row['quality_score'] is not None and row['audience_label']:
             print(f"Inserting {row}")
             db['labeled_articles'].upsert(row, ['url'])
+        curr[serialized_kwargs] += 1
+    elif action == 'skip':
+        curr[serialized_kwargs] += 1
     elif action == 'undo' and kwargs['history']:
         print(f"History: {kwargs['history']}")
 
@@ -251,8 +254,7 @@ def get_classifier_predictions():
         response = json.dumps({"results": result}, indent=4, default=lambda x: x if not isinstance(x, datetime.datetime) else x.isoformat()),
         status = 200,
         mimetype='application/json')
-    if action == 'submit':
-        curr[serialized_kwargs] += 1
+
     return response
 
 
