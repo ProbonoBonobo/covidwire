@@ -112,19 +112,26 @@ def sort_articles_by_classification_perplexity():
         'image_url', "url")})
     return deque(sorted(candidates, key=classification_perplexity))
 import os
+import numpy as np
+from scipy.stats import expon
 from urllib.parse import unquote_plus
 import base64
 from collections import defaultdict
+curr = defaultdict(lambda: 0)
 @app.route('/classified', methods=['GET'])
 def get_classifier_predictions():
+    global curr
     actual_labels = ("approved", "rejected", "international", "city", "regional", "national", "indefinite", "state")
     classifier_labels = ("approved", "rejected", "international", "local", "regional", "national", "unbound", "state")
+
     transtable = dict(zip(actual_labels, classifier_labels))
     # ip_addr = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
 
     kwargs = {"audience": "local,regional,state,national,international,indefinite",
               "auth": "",
               "_limit": 50,
+              "action": "skip",
+              "history": [],
               "quality_score": None,
               "audience_label": None,
               "url": None,
@@ -165,6 +172,7 @@ def get_classifier_predictions():
 
     _kwargs = json.loads(base64.decodebytes(payload.encode('utf-8')).decode('utf-8'))
     kwargs.update(_kwargs)
+    action = kwargs['action']
     # print(_kwargs)
     #
     #
@@ -177,34 +185,55 @@ def get_classifier_predictions():
         return response
     print(kwargs)
     keys = {"ambiguity": ambiguousness, "gradient descent": gradient}
-    serialized_kwargs = str({k:v for k,v in kwargs.items() if k in ("audience",)})
-    kwargs['hash'] = serialized_kwargs.__hash__()
-    row = {"url": kwargs['url'], 'filterid': str(kwargs['hash']), 'title': kwargs['title'], 'description': kwargs['description'], 'content': kwargs['content'], 'name': kwargs['name'], 'quality_score': kwargs['quality_score'], "audience_label": kwargs['audience_label']}
-    if row['url'] and row['quality_score'] and row['audience_label']:
-        db['labeled_articles'].upsert(row, ['url'])
+    serialized_kwargs = str({k: v for k, v in kwargs.items() if k in ("audience",)})
+    if action == 'submit':
+        kwargs['hash'] = serialized_kwargs.__hash__()
+        row = {"url": kwargs['url'], 'filterid': str(kwargs['hash']), 'title': kwargs['title'], 'description': kwargs['description'], 'content': kwargs['content'], 'name': kwargs['name'], 'quality_score': kwargs['quality_score'], "audience_label": kwargs['audience_label']}
+        if row['url'] and row['quality_score'] and row['audience_label']:
+            db['labeled_articles'].upsert(row, ['url'])
+    elif action == 'undo':
+        kwargs['hash']
     # sort_function = keys[kwargs['sortOrder']]
-    if serialized_kwargs in cache and cache[serialized_kwargs][0] > time.time():
+    if serialized_kwargs in cache and cache[serialized_kwargs][0] > time.time() and curr[serialized_kwargs] < 100:
         results = cache[serialized_kwargs][1]
     else:
         selected_labels = set(kwargs['audience'].split(","))
-        if not all(label in classifier_labels for label in selected_labels):
-            response = app.response_class( response = f"invalid audience: {selected_labels} valid audiences: {classifier_labels}", status=200)
-            return response
-        docvec_indices = set([classifier_labels.index(label) for label in selected_labels])
-        # print(f"Selected labels: {selected_labels} Indices: {docvec_indices}")
+        seen = set([row['url'] for row in db.query("select url from labeled_articles")])
+        filtered = list([row for row in db.query("select distinct on (title) * from training_queue order by perplexity desc;") if row['url'] not in seen])
         results = []
-        for article in sort_articles_by_approval_perplexity():
-            if article['audience'] in transtable and transtable[article['audience']] in selected_labels:
-                article['docvec_v2'] = dict(zip(classifier_labels, article['docvec_v2']))
-                results.append({k:v for k,v in article.items() if k in ('title', 'description', 'content', 'name', 'published_at', 'docvec_v2', 'prediction', 'audience', 'loc', 'image_url', "url")})
-        cache[serialized_kwargs] = (time.time() + 3600, results)
-    index = list(db.query("select count(*) from labeled_articles;"))[0]
-    result = results[db['labeled_articles'].count(filterid=str(row['filterid']))]
+        if selected_labels:
+            docvec_indices = set([classifier_labels.index(label) for label in selected_labels])
+            if not all(label in classifier_labels for label in selected_labels):
+                return app.response_class( response = f"invalid audience: {selected_labels} valid audiences: {classifier_labels}", status=200)
+            filtered = [row for row in filtered if transtable[row['audience']] in selected_labels]
+        while len(results) < 100:
+            for row in filtered:
+                if random.random() < 0.1:
+                    row['docvec_v2'] = dict(zip(classifier_labels, row['docvec_v2']))
+                    results.append(row)
+
+
+
+
+        # if not all(label in classifier_labels for label in selected_labels):
+        #     response = app.response_class( response = f"invalid audience: {selected_labels} valid audiences: {classifier_labels}", status=200)
+        #     return response
+        # docvec_indices = set([classifier_labels.index(label) for label in selected_labels])
+        # # print(f"Selected labels: {selected_labels} Indices: {docvec_indices}")
+        # results = []
+        # for article in sort_articles_by_approval_perplexity():
+        #     if article['audience'] in transtable and transtable[article['audience']] in selected_labels:
+        #         article['docvec_v2'] = dict(zip(classifier_labels, article['docvec_v2']))
+        #         results.append({k:v for k,v in article.items() if k in ('title', 'description', 'content', 'name', 'published_at', 'docvec_v2', 'prediction', 'audience', 'loc', 'image_url', "url")})
+        cache[serialized_kwargs] = (time.time() + 9000, results)
+        curr[serialized_kwargs] = 0
+    # index = list(db.query("select count(*) from labeled_articles;"))[0]
+    result = results[curr[serialized_kwargs]]
     response = app.response_class(
         response = json.dumps({"results": result}, indent=4, default=lambda x: x if not isinstance(x, datetime.datetime) else x.isoformat()),
         status = 200,
         mimetype='application/json')
-    print(response)
+    curr[serialized_kwargs] += 1
     return response
 
 
