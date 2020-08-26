@@ -170,6 +170,7 @@ def get_classifier_predictions():
     _kwargs = {k: urldecode(v) for k, v in request.args.items()} or {}
     kwargs.update(_kwargs)
     if not kwargs['auth'] == os.environ.get("DAQ_AUTH_TOKEN", "CovidWire2020"):
+        print("bad password:", kwargs['auth'])
         response = app.response_class(
             response=f"invalid password", status=403)
         return response
