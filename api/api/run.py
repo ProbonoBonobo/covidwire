@@ -224,7 +224,10 @@ def get_classifier_predictions():
         while len(results) < 100:
             for row in filtered:
                 if random.random() < 0.1:
-                    row['docvec_v2'] = dict(zip(classifier_labels, row['docvec_v2']))
+                    docvec = eval("[" + row['hidden_weights'][1:-1] + "]")
+                    print(f"Docvec is: {docvec}")
+                    row['docvec_v2'] = dict(zip(classifier_labels,))
+                    print(json.dumps(row['docvec_v2']))
                     results.append(row)
 
 
