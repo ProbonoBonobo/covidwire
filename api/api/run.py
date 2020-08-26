@@ -189,7 +189,7 @@ def get_classifier_predictions():
     keys = {"ambiguity": ambiguousness, "gradient descent": gradient}
     serialized_kwargs = str({k: v for k, v in kwargs.items() if k in ("audience",)})
     if action == 'submit':
-        cols = {"time_sensitivity", "sports_related", "problematic", "opinion", "syndicated", "audience_label", "title", "url", "description", "content", "quality_score"}
+        cols = {'name', "time_sensitivity", "sports_related", "problematic", "opinion", "syndicated", "audience_label", "title", "url", "description", "content", "quality_score"}
 
         #row = {"url": kwargs['url'], 'filterid': str(kwargs['hash']), 'title': kwargs['title'], 'description': kwargs['description'], 'content': kwargs['content'], 'name': kwargs['name'], 'quality_score': kwargs['quality_score'], "audience_label": kwargs['audience_label']}
         row = {k: kwargs[k] for k in cols}
@@ -248,7 +248,8 @@ def get_classifier_predictions():
         response = json.dumps({"results": result}, indent=4, default=lambda x: x if not isinstance(x, datetime.datetime) else x.isoformat()),
         status = 200,
         mimetype='application/json')
-    curr[serialized_kwargs] += 1
+    if action == 'submit':
+        curr[serialized_kwargs] += 1
     return response
 
 
