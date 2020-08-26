@@ -131,6 +131,7 @@ def get_classifier_predictions():
               "auth": "",
               "_limit": 50,
               "action": "skip",
+              "hash": None,
               "history": [],
               "quality_score": None,
               "audience_label": None,
@@ -173,6 +174,7 @@ def get_classifier_predictions():
     _kwargs = json.loads(base64.decodebytes(payload.encode('utf-8')).decode('utf-8'))
     kwargs.update(_kwargs)
     action = kwargs['action']
+    print(f"Action is: {action}")
     # print(_kwargs)
     #
     #
@@ -187,13 +189,23 @@ def get_classifier_predictions():
     keys = {"ambiguity": ambiguousness, "gradient descent": gradient}
     serialized_kwargs = str({k: v for k, v in kwargs.items() if k in ("audience",)})
     if action == 'submit':
-        cols = ("time_sensitivity", "sports_related", "problematic", "opinion")
-        kwargs['hash'] = serialized_kwargs.__hash__()
-        row = {"url": kwargs['url'], 'filterid': str(kwargs['hash']), 'title': kwargs['title'], 'description': kwargs['description'], 'content': kwargs['content'], 'name': kwargs['name'], 'quality_score': kwargs['quality_score'], "audience_label": kwargs['audience_label']}
+        cols = {"time_sensitivity", "sports_related", "problematic", "opinion", "syndicated", "audience_label", "title", "url", "description", "content", "quality_score"}
+
+        #row = {"url": kwargs['url'], 'filterid': str(kwargs['hash']), 'title': kwargs['title'], 'description': kwargs['description'], 'content': kwargs['content'], 'name': kwargs['name'], 'quality_score': kwargs['quality_score'], "audience_label": kwargs['audience_label']}
+        row = {k: kwargs[k] for k in cols}
+        row['filterid'] =  serialized_kwargs.__hash__()
+        row['hidden_weights'] = kwargs['hidden_weights']
         if row['url'] and row['quality_score'] and row['audience_label']:
             db['labeled_articles'].upsert(row, ['url'])
-    elif action == 'undo':
-        kwargs['hash']
+    elif action == 'undo' and kwargs['history']:
+        print(f"History: {kwargs['history']}")
+
+        last_url = kwargs['history'][-1]
+        print(f"Undoing changes to {last_url}")
+        db['labeled_articles'].delete(url=last_url)
+
+
+
     # sort_function = keys[kwargs['sortOrder']]
     if serialized_kwargs in cache and cache[serialized_kwargs][0] > time.time() and curr[serialized_kwargs] < 100:
         results = cache[serialized_kwargs][1]
