@@ -187,6 +187,7 @@ def get_classifier_predictions():
     keys = {"ambiguity": ambiguousness, "gradient descent": gradient}
     serialized_kwargs = str({k: v for k, v in kwargs.items() if k in ("audience",)})
     if action == 'submit':
+        cols = ("time_sensitivity", "sports_related", "problematic", "opinion")
         kwargs['hash'] = serialized_kwargs.__hash__()
         row = {"url": kwargs['url'], 'filterid': str(kwargs['hash']), 'title': kwargs['title'], 'description': kwargs['description'], 'content': kwargs['content'], 'name': kwargs['name'], 'quality_score': kwargs['quality_score'], "audience_label": kwargs['audience_label']}
         if row['url'] and row['quality_score'] and row['audience_label']:
