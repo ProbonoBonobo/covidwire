@@ -151,10 +151,11 @@ input_group = [dbc.FormGroup(
                         #inputStyle={"background-color": "tomato", "border": "10px solid blue", "color": "chartreuse"},
                         labelCheckedStyle={"font-weight": 900, "transform": "translate(0px 5px);", "color": "#fcfcfc"},
                     )]),
-    html.Div(
-        dbc.Button("Next", color="primary", id="submit", n_clicks=0),
-
-    ),
+    dbc.FormGroup([
+        dbc.Button("Submit", color="success", id="submit", n_clicks=0, className='ml-2'),
+        dbc.Button("Skip", color='warning', id='skip', n_clicks=0, className='ml-2'),
+        dbc.Button("Undo", color='danger', id='undo', n_clicks=0)
+        ]),
 ]
 right_sidebar = html.Div(input_group, style=RIGHT_SIDEBAR_STYLE)
 def render_audience_graph(values):
@@ -374,9 +375,7 @@ def render_content(headline="None", image_url="localhost:8000/404.png", publicat
                                     )
                                 ],
                             style={'margin-top': '5vh'}),
-                            dcc.Store(id='appstate',
-                                      data={"content": content, "title": headline, "description": description,
-                                            "url": url, "name": publication})
+
                         ]
                     ),
                 ]
@@ -393,7 +392,9 @@ app.layout = html.Div(
         sidebar,
         html.Div(id="page-content", children=render_content()),
 
-        right_sidebar
+        right_sidebar,
+        dcc.Store(id='appstate',
+                                      data={'history': []})
     ]
 )
 
@@ -431,16 +432,25 @@ def toggle_active_links(pathname):
 import json
 from collections import defaultdict
 @app.callback(
-    [Output("page-content", "children"), Output("audience-prediction", "children"), Output('approval-matrix', 'children')],
-    [Input("url", "pathname"), Input("submit", "n_clicks"), Input('audience-filters', 'value')],
+    [Output("page-content", "children"), Output("audience-prediction", "children"), Output('approval-matrix', 'children'), Output('appstate', 'data')],
+    [Input("url", "pathname"), Input("submit", "n_clicks"), Input("skip", "n_clicks"), Input("undo", "n_clicks"), Input('audience-filters', 'value')],
     [State('auth', 'value'), State('quality-score', 'value'), State('audience-label', 'value'), State('appstate', 'data'), State('article-tags', 'value')]
 )
-def render_page_content(pathname, n_clicks, audience_filters, auth, score, audience_label, appstate, tags):
+def render_page_content(pathname, submit, skip, undo, audience_filters, auth, score, audience_label, appstate, tags):
+    ctx = dash.callback_context
+
+    if not ctx.triggered:
+        button_id = 'No clicks yet'
+    else:
+        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    action = button_id if button_id in ('skip', 'submit', 'undo') else 'skip'
     # n_clicks = n_clicks if n_clicks else 0
     print(audience_filters)
     print(appstate)
     # appstate = defaultdict(lambda: "None", appstate)
-    _kwargs = {'p': n_clicks,
+    _kwargs = {'p': submit,
+               'action': action,
+               'history': appstate['history'],
                "quality_score": score,
                "audience_label": audience_label,
                "url": "",
@@ -454,7 +464,7 @@ def render_page_content(pathname, n_clicks, audience_filters, auth, score, audie
                "time_sensitivity": 0,
                "sports_related": 0,
                "problematic": 0}
-    if appstate:
+    if appstate and 'url' in appstate:
         _kwargs.update({"url": appstate['url'], "title": appstate['title'], "name": appstate['name'], 'description': appstate['description'], "content": appstate['content']})
     if audience_filters:
         _kwargs["audience"] = ','.join(audience_filters)
@@ -485,6 +495,7 @@ def render_page_content(pathname, n_clicks, audience_filters, auth, score, audie
         docvec = nxt['docvec_v2']
         url = nxt['url']
 
+
     if pathname in ["/", "/page-1"]:
         body = render_content(headline, image_url, publication, description, content, audience_filters, auth, url)
 
@@ -492,8 +503,14 @@ def render_page_content(pathname, n_clicks, audience_filters, auth, score, audie
         audience_preds = [docvec['local'], docvec['regional'], docvec['state'], docvec['national'], docvec['international'], docvec['unbound']]
         audience_graph = dcc.Graph(figure=render_audience_graph(audience_preds))
         approval_matrix = dcc.Graph(figure=render_approval_matrix(approval_vals))
+        appstate.update({"content": content,
+                    "title": headline,
+                    "description": description,
+                    "url": url,
+                    "name": publication})
+        appstate['history'].append(url)
         print(audience_graph)
-        return [body,audience_graph, approval_matrix]
+        return [body,audience_graph, approval_matrix, appstate]
     elif pathname == "/page-2":
         return html.P("This is the content of page 2. Yay!")
     elif pathname == "/page-3":
