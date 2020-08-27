@@ -121,9 +121,11 @@ curr = defaultdict(lambda: 0)
 # semaphore = os.path.join(os.path.dirname(__file__), ".lastmod")
 # f = open(semaphore, "w+")
 # f.write("0")
+labeled_articles_count = 0
 @app.route('/classified', methods=['GET'])
 def get_classifier_predictions():
     global curr
+    global labeled_articles_count
     actual_labels = ("approved", "rejected", "international", "city", "regional", "national", "indefinite", "state")
     classifier_labels = ("approved", "rejected", "international", "local", "regional", "national", "unbound", "state")
     # f.seek(0)
@@ -213,15 +215,18 @@ def get_classifier_predictions():
         if row['url'] and row['quality_score'] is not None and row['audience_label']:
             print(f"Inserting {row}")
             db['labeled_articles'].upsert(row, ['url'])
-        curr[serialized_kwargs] += 1
+            curr[serialized_kwargs] += 1
+            labeled_articles_count += 1
     elif action == 'skip':
         curr[serialized_kwargs] += 1
+
     elif action == 'undo' and kwargs['history']:
         print(f"History: {kwargs['history']}")
 
         last_url = kwargs['history'][-1]
         print(f"Undoing changes to {last_url}")
         db['labeled_articles'].delete(url=last_url)
+        labeled_articles_count -= 1
 
 
 
@@ -232,6 +237,7 @@ def get_classifier_predictions():
         print(kwargs)
 
         seen = set([row['url'] for row in db.query("select url from labeled_articles")])
+        labeled_articles_count = len(list(seen))
         filtered = list([row for row in db.query("select distinct on (title, perplexity) * from training_queue order by perplexity desc;") if row['url'] not in seen])
         results = []
         if 'audience' in kwargs and kwargs['audience']:
@@ -272,6 +278,7 @@ def get_classifier_predictions():
         curr[serialized_kwargs] = 0
     # index = list(db.query("select count(*) from labeled_articles;"))[0]
     result = results[curr[serialized_kwargs]]
+    result['labeled_articles_count'] = labeled_articles_count
     response = app.response_class(
         response = json.dumps({"results": result}, indent=4, default=lambda x: x if not isinstance(x, datetime.datetime) else x.isoformat()),
         status = 200,
