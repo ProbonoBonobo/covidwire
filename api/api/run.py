@@ -202,7 +202,7 @@ def get_classifier_predictions():
     keys = {"ambiguity": ambiguousness, "gradient descent": gradient}
     serialized_kwargs = str({k: v for k, v in kwargs.items() if k in ("audience",)})
     if action == 'submit':
-        cols = {'name', "time_sensitivity", "sports_related", "problematic", "opinion", "syndicated", "audience_label", "title", "url", "description", "content", "quality_score"}
+        cols = {'name', "time_sensitivity", "sports_related", "problematic", "opinion", "syndicated", "audience_label", "title", "url", "description", "content", "quality_score", 'id'}
 
         #row = {"url": kwargs['url'], 'filterid': str(kwargs['hash']), 'title': kwargs['title'], 'description': kwargs['description'], 'content': kwargs['content'], 'name': kwargs['name'], 'quality_score': kwargs['quality_score'], "audience_label": kwargs['audience_label']}
         row = {k: kwargs[k] for k in cols}
@@ -235,8 +235,9 @@ def get_classifier_predictions():
         results = []
         if 'audience' in kwargs and kwargs['audience']:
             selected_labels = set(kwargs['audience'].split(","))
+            print(selected_labels)
 
-            docvec_indices = set([classifier_labels.index(label) for label in selected_labels])
+            docvec_indices = set([classifier_labels.index(label) for label in selected_labels if label in classifier_labels])
             if not all(label in classifier_labels for label in selected_labels):
                 return app.response_class( response = f"invalid audience: {selected_labels} valid audiences: {classifier_labels}", status=200)
             filtered = [row for row in filtered if transtable[row['audience']] in selected_labels]
