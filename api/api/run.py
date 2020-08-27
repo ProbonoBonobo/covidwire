@@ -118,12 +118,25 @@ from urllib.parse import unquote_plus
 import base64
 from collections import defaultdict
 curr = defaultdict(lambda: 0)
+semaphore = os.path.join(os.path.dirname(__file__), ".lastmod")
+f = open(semaphore, "w+")
+f.write(0)
 @app.route('/classified', methods=['GET'])
 def get_classifier_predictions():
     global curr
     actual_labels = ("approved", "rejected", "international", "city", "regional", "national", "indefinite", "state")
     classifier_labels = ("approved", "rejected", "international", "local", "regional", "national", "unbound", "state")
+    f.seek(0)
+    lastmod = float(f.read().strip() or "0")
 
+    dt = time.time() - lastmod
+    if dt < 0.2:
+        print("Suppressing update")
+        raise dash.exceptions.PreventUpdate
+    else:
+        f.seek(0)
+        f.write(str(time.time()))
+        f.truncate()
     transtable = dict(zip(actual_labels, classifier_labels))
     # ip_addr = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
 
