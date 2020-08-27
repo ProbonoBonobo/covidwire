@@ -228,12 +228,14 @@ def get_classifier_predictions():
     if serialized_kwargs in cache and cache[serialized_kwargs][0] > time.time() and curr[serialized_kwargs] < 100:
         results = cache[serialized_kwargs][1]
     else:
+        print(kwargs)
 
         seen = set([row['url'] for row in db.query("select url from labeled_articles")])
         filtered = list([row for row in db.query("select distinct on (title, perplexity) * from training_queue order by perplexity desc;") if row['url'] not in seen])
         results = []
         if 'audience' in kwargs and kwargs['audience']:
             selected_labels = set(kwargs['audience'].split(","))
+
             docvec_indices = set([classifier_labels.index(label) for label in selected_labels])
             if not all(label in classifier_labels for label in selected_labels):
                 return app.response_class( response = f"invalid audience: {selected_labels} valid audiences: {classifier_labels}", status=200)
