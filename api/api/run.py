@@ -180,7 +180,8 @@ def get_classifier_predictions():
         return inner
     if not 'payload' in request.args:
         return app.response_class(
-            response="", status=403)
+            response={"results": f"invalid args: {request.args}"}, status=403,
+        mimetype='application/json')
     payload = unquote_plus(request.args['payload'])
     print(f"Payload: {payload}")
 
@@ -196,7 +197,7 @@ def get_classifier_predictions():
     if not kwargs['auth'] == os.environ.get("DAQ_AUTH_TOKEN", "CovidWire2020"):
         print("bad password:", kwargs['auth'])
         response = app.response_class(
-            response=f"invalid password", status=403)
+            response={"results": "invalid password"}, status=403, mimetype='application/json')
         return response
     print(kwargs)
     keys = {"ambiguity": ambiguousness, "gradient descent": gradient}
