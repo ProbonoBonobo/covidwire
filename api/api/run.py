@@ -140,7 +140,7 @@ def get_classifier_predictions():
     transtable = dict(zip(actual_labels, classifier_labels))
     # ip_addr = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
 
-    kwargs = {"audience": "local,regional,state,national,international,indefinite",
+    kwargs = {"audience": "local,regional,state,national,international,unbound",
               "auth": "",
               "_limit": 50,
               "action": "skip",
