@@ -118,9 +118,9 @@ from urllib.parse import unquote_plus
 import base64
 from collections import defaultdict
 curr = defaultdict(lambda: 0)
-semaphore = os.path.join(os.path.dirname(__file__), ".lastmod")
-f = open(semaphore, "w+")
-f.write("0")
+# semaphore = os.path.join(os.path.dirname(__file__), ".lastmod")
+# f = open(semaphore, "w+")
+# f.write("0")
 @app.route('/classified', methods=['GET'])
 def get_classifier_predictions():
     global curr
