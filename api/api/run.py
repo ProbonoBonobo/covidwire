@@ -207,7 +207,7 @@ def get_classifier_predictions():
         #row = {"url": kwargs['url'], 'filterid': str(kwargs['hash']), 'title': kwargs['title'], 'description': kwargs['description'], 'content': kwargs['content'], 'name': kwargs['name'], 'quality_score': kwargs['quality_score'], "audience_label": kwargs['audience_label']}
         row = {k: kwargs[k] for k in cols}
         row['filterid'] =  serialized_kwargs.__hash__()
-        row['hidden_weights'] = kwargs['hidden_weights']
+        # row['hidden_weights'] = kwargs['hidden_weights']
 
         if row['url'] and row['quality_score'] is not None and row['audience_label']:
             print(f"Inserting {row}")
@@ -228,11 +228,12 @@ def get_classifier_predictions():
     if serialized_kwargs in cache and cache[serialized_kwargs][0] > time.time() and curr[serialized_kwargs] < 100:
         results = cache[serialized_kwargs][1]
     else:
-        selected_labels = set(kwargs['audience'].split(","))
+
         seen = set([row['url'] for row in db.query("select url from labeled_articles")])
         filtered = list([row for row in db.query("select distinct on (title, perplexity) * from training_queue order by perplexity desc;") if row['url'] not in seen])
         results = []
-        if selected_labels:
+        if 'audience' in kwargs and kwargs['audience']:
+            selected_labels = set(kwargs['audience'].split(","))
             docvec_indices = set([classifier_labels.index(label) for label in selected_labels])
             if not all(label in classifier_labels for label in selected_labels):
                 return app.response_class( response = f"invalid audience: {selected_labels} valid audiences: {classifier_labels}", status=200)
@@ -243,6 +244,10 @@ def get_classifier_predictions():
                     docvec = eval("[" + row['docvec_v2'][1:-1] + "]")
                     print(f"Docvec is: {docvec}")
                     row['docvec_v2'] = dict(zip(classifier_labels,docvec))
+                    words =  row['content'].split(" ")
+                    if len(words) > 140:
+                        words = words[0:140]
+                        row['content'] = ' '.join(words) + "..."
                     print(json.dumps(row['docvec_v2']))
                     results.append(row)
 
