@@ -238,7 +238,8 @@ def get_classifier_predictions():
 
         seen = set([row['url'] for row in db.query("select url from labeled_articles")])
         labeled_articles_count = len(list(seen))
-        filtered = list([row for row in db.query("select distinct on (title, perplexity) * from training_queue order by perplexity desc;") if row['url'] not in seen])
+        filtered = list([row for row in db.query("select distinct on (title, perplexity) * from training_queue_v2 order by perplexity desc;") if row['url'] not in seen])
+        filtered = random.sample(filtered, k=len(filtered))
         results = []
         if 'audience' in kwargs and kwargs['audience']:
             selected_labels = set(kwargs['audience'].split(","))
@@ -250,16 +251,16 @@ def get_classifier_predictions():
             filtered = [row for row in filtered if transtable[row['audience']] in selected_labels]
         while len(results) < 100:
             for row in filtered:
-                if random.random() < 0.1:
-                    docvec = eval("[" + row['docvec_v2'][1:-1] + "]")
-                    print(f"Docvec is: {docvec}")
-                    row['docvec_v2'] = dict(zip(classifier_labels,docvec))
-                    words =  row['content'].split(" ")
-                    if len(words) > 140:
-                        words = words[0:140]
-                        row['content'] = ' '.join(words) + "..."
-                    print(json.dumps(row['docvec_v2']))
-                    results.append(row)
+                # if random.random() < 0.1:
+                docvec = eval("[" + row['docvec_v2'][1:-1] + "]")
+                print(f"Docvec is: {docvec}")
+                row['docvec_v2'] = dict(zip(classifier_labels,docvec))
+                words =  row['content'].split(" ")
+                if len(words) > 140:
+                    words = words[0:140]
+                    row['content'] = ' '.join(words) + "..."
+                print(json.dumps(row['docvec_v2']))
+                results.append(row)
 
 
 
