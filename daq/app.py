@@ -237,20 +237,23 @@ input_group = [dbc.FormGroup(
                         labelCheckedStyle={"font-weight": 900, "transform": "translate(0px 5px);", "color": "#fcfcfc"},
                     )]),
     dbc.FormGroup([
-        dbc.Button("Submit", color="success", id="submit", n_clicks=0, className='ml-3', disabled=True),
-        dbc.Button("Skip", color='warning', id='skip', n_clicks=0, className='ml-3'),
-        dbc.Button("Undo", color='danger', id='undo', n_clicks=0, className='ml-3')
-        ]),
 
 html.Datalist(
     id='list-suggested-inputs',
     children=[html.Option(value=word) for word in suggestions]
 ),
-dcc.Input(id='input-1',
+dbc.Label(html.H3("Primary location")),
+dbc.Input(id='input-1',
     type='text',
     list='list-suggested-inputs',
     value=''
-),
+)]),
+    dbc.FormGroup([
+        dbc.Button("Submit", color="success", id="submit", n_clicks=0, className='ml-3 center', disabled=True),
+        dbc.Button("Skip", color='warning', id='skip', n_clicks=0, className='ml-3 center'),
+        dbc.Button("Undo", color='danger', id='undo', n_clicks=0, className='ml-3 center')
+    ], style={"text-align": "center"}),
+
 ]
 right_sidebar = html.Div(input_group, style=RIGHT_SIDEBAR_STYLE)
 def render_audience_graph(values):
@@ -556,21 +559,24 @@ def unhide_component(quality_score):
         return ''
 
 @app.callback(Output('submit', 'disabled'),
-              [Input('quality-score', 'value'), Input('audience-label', 'value'),  Input('time-sensitivity', 'value')])
-def allow_submit(relevance, audience, quality):
-    if all(map(lambda x: x is not None, [relevance, quality, audience])):
+              [Input('quality-score', 'value'), Input('audience-label', 'value'),  Input('time-sensitivity', 'value')],
+              [State('input-1', 'value')])
+def allow_submit(relevance, audience, quality, location):
+
+    if all(map(lambda x: x is not None, [relevance, quality, audience, location])) and location in suggestions:
         return False
-    elif relevance == 0 and not quality and audience:
+    elif relevance == 0 and not quality and audience and location and location in suggestions:
         return False
+
     return True
 
 
 @app.callback(
     [Output("article-content", "children"), Output("headline", "children"), Output('image-url', 'src'), Output('description', 'children'), Output('publication-name', 'children'), Output('auth', 'value'), Output("audience-prediction", "children"), Output('approval-matrix', 'children'), Output('appstate', 'data'), Output('audience-filters', 'value'), Output('quality-score', 'value'), Output('time-sensitivity', 'value'), Output('audience-label', 'value'), Output('article-tags', 'value'), Output('labeled-articles-count', 'value')],
     [Input("submit", "n_clicks"), Input("skip", "n_clicks"), Input("undo", "n_clicks")],
-    [State('audience-filters', 'value'), State('auth', 'value'), State('quality-score', 'value'), State('time-sensitivity', 'value'), State('audience-label', 'value'), State('appstate', 'data'), State('article-tags', 'value')]
+    [State('audience-filters', 'value'), State('auth', 'value'), State('quality-score', 'value'), State('time-sensitivity', 'value'), State('audience-label', 'value'), State('appstate', 'data'), State('article-tags', 'value'), State('input-1', 'value')]
 )
-def render_page_content(submit, skip, undo, audience_filters, auth, score, time_sensitivity, audience_label, appstate, tags):
+def render_page_content(submit, skip, undo, audience_filters, auth, score, time_sensitivity, audience_label, appstate, tags, location):
     # f.seek(0)
     # lastmod = float(f.read().strip() or "0")
     #
@@ -600,6 +606,7 @@ def render_page_content(submit, skip, undo, audience_filters, auth, score, time_
                'action': action,
                'history': appstate['history'],
                "quality_score": score,
+               'location': location,
                "audience_label": audience_label,
                "url": appstate['url'],
                "title": appstate['title'],
@@ -624,7 +631,7 @@ def render_page_content(submit, skip, undo, audience_filters, auth, score, time_
     # _kwargs.update(tags)
     _kwargs['auth'] = auth
     try:
-        payload = base64.encodestring(json.dumps({k: _kwargs[k] for k in ('action', 'history', 'quality_score', 'audience_label', 'url', 'title', 'id', 'name', 'syndicated', 'opinion', 'feature_worthy', 'time_sensitivity', 'problematic', 'sports_related', 'syndicated', 'auth')}).encode('utf-8')).decode("utf-8")
+        payload = base64.encodestring(json.dumps({k: _kwargs[k] for k in ('action', 'history', 'quality_score', 'audience_label', 'url', 'title', 'id', 'name', 'syndicated', 'opinion', 'feature_worthy', 'time_sensitivity', 'problematic', 'sports_related', 'syndicated', 'auth', 'location')}).encode('utf-8')).decode("utf-8")
     except Exception as e:
         print(f"Exception : {e.__class__.__name__} :: {e}")
         payload = base64.encodestring(json.dumps({"auth": auth}).encode('utf-8')).decode("utf-8")
