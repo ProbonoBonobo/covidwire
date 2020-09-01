@@ -249,7 +249,7 @@ def get_classifier_predictions():
             docvec_indices = set([classifier_labels.index(label) for label in selected_labels if label in classifier_labels])
             if not all(label in classifier_labels for label in selected_labels):
                 return app.response_class( response = f"invalid audience: {selected_labels} valid audiences: {classifier_labels}", status=200)
-            filtered = [row for row in filtered if transtable[row['audience']] in selected_labels]
+            filtered = [row for row in filtered if row['audience'] and transtable[row['audience']] in selected_labels]
         while len(results) < 100:
             for row in filtered:
                 # if random.random() < 0.1:
