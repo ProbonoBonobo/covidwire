@@ -213,7 +213,7 @@ def get_classifier_predictions():
         row['filterid'] =  serialized_kwargs.__hash__()
         # row['hidden_weights'] = kwargs['hidden_weights']
 
-        if row['url'] and row['audience_label']:
+        if row['url']:
             print(f"Inserting {row}\nLocation: {row['location']}")
             db['labeled_articles'].upsert(row, ['id'])
             curr[serialized_kwargs] += 1
