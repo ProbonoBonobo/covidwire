@@ -144,6 +144,7 @@ def get_classifier_predictions():
 
     kwargs = {"audience": "local,regional,state,national,international,unbound",
               "auth": "",
+              "location": None,
               "_limit": 50,
               "action": "skip",
               "hash": None,
@@ -213,7 +214,7 @@ def get_classifier_predictions():
         # row['hidden_weights'] = kwargs['hidden_weights']
 
         if row['url'] and row['quality_score'] is not None and row['audience_label']:
-            print(f"Inserting {row}")
+            print(f"Inserting {row}\nLocation: {row['location']}")
             db['labeled_articles'].upsert(row, ['id'])
             curr[serialized_kwargs] += 1
             labeled_articles_count += 1
