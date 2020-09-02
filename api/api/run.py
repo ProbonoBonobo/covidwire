@@ -239,7 +239,7 @@ def get_classifier_predictions():
 
         seen = set([row['url'] for row in db.query("select url from labeled_articles")])
         labeled_articles_count = len(list(seen))
-        filtered = list([row for row in db.query("select distinct on (title) * from training_queue_v3 limit 300;") if row['url'] not in seen])
+        filtered = list([row for row in db.query("select distinct on (title) * from training_queue_v3;") if row['url'] not in seen])
         filtered = random.sample(filtered, k=len(filtered))
         results = []
         if 'audience' in kwargs and kwargs['audience']:
