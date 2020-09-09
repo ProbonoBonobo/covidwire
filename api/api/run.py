@@ -23,7 +23,7 @@ cors = CORS(app)
 app.config['CORS_HEADERS'] = 'Content-Type'
 app.config["DEBUG"] = True
 cols = ("approved", "rejected", "international", "local", "regional", "national", "unbound", "state")
-transtable = {"approved": "approved", "rejected": "rejected", "local": "city", "regional": "regional", "national": "national", "unbound": "indefinite", "state": "state"}
+transtable = {"approved": "approved", "rejected": "rejected", "local": "city", "regional": "local", "national": "national", "unbound": "indefinite", "state": "state"}
 
 @app.route('/', methods=['GET'])
 def home():
