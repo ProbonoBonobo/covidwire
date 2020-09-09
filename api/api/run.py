@@ -73,7 +73,7 @@ def get_scored_results():
     #formatted_results = '</div><div>'.join([json.dumps(result, indent=4, default=str).replace(" ", "&nbsp;").replace("\n", "<br>").replace("\\n", "<br>") for result in results[start:stop]])
     if kwargs['audience']:
         audience = kwargs['audience']
-        results = [result for result in results if result['audience'] == audience]
+        results = [result for result in results if result['audience'] in audience]
     results = results[start:min(stop, len(results))]
     response = app.response_class(
         response = json.dumps(results, indent=4, default=lambda x: x if not isinstance(x, datetime.datetime) else x.isoformat()),
