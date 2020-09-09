@@ -23,7 +23,7 @@ cors = CORS(app)
 app.config['CORS_HEADERS'] = 'Content-Type'
 app.config["DEBUG"] = True
 cols = ("approved", "rejected", "international", "local", "regional", "national", "unbound", "state")
-
+transtable = {"approved": "approved", "rejected": "rejected", "local": "city", "regional": "regional", "national": "national", "unbound": "indefinite", "state": "state"}
 
 @app.route('/', methods=['GET'])
 def home():
@@ -72,8 +72,11 @@ def get_scored_results():
     #ormatted_args = '</p><p>'.join([f"{k} = {v}\n" for k, v in request.args.items()])
     #formatted_results = '</div><div>'.join([json.dumps(result, indent=4, default=str).replace(" ", "&nbsp;").replace("\n", "<br>").replace("\\n", "<br>") for result in results[start:stop]])
     if kwargs['audience']:
-        audience = kwargs['audience']
+
+        audience = set([transtable[x] for x in kwargs['audience'].split(",")])
+        print(f"Filtering results for audience={audience}")
         results = [result for result in results if result['audience'] in audience]
+
     results = results[start:min(stop, len(results))]
     response = app.response_class(
         response = json.dumps(results, indent=4, default=lambda x: x if not isinstance(x, datetime.datetime) else x.isoformat()),
