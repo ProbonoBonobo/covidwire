@@ -54,10 +54,10 @@ def get_scored_results():
         results = cache[fips][1]
     else:
         query = f"""SELECT distinct on (title)
-        published_at, name, title, description, url, docvec_v2 as docvec, ner, image_url, audience, mod_status, prediction, city, state, loc, cast(scored ->> '{fips}' as float)  / (extract(days from (now() - published_at)) + 1) as score
+        published_at, name, title, description, url, docvec_v2 as docvec, ner, image_url, audience, mod_status, prediction, city, state, loc, ( abs(docvec_v2[1] / docvec_v2[2]) * cast(scored ->> '{fips}' as float)  / (extract(days from (now() - published_at)) + 1)) as score
     FROM
         {TABLE}
-    WHERE prediction = 'approved' and scored ->> '{fips}' != '0';"""
+    WHERE prediction = 'approved' and docvec_v2 is not null and docvec_v2[2] > 1.5 and docvec_v2[1] < -2.0;"""
         results = []
         for r in sorted(list(db.query(query)), key=lambda x: x['score'], reverse=True):
             # try:
