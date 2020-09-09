@@ -59,7 +59,7 @@ def get_scored_results():
         {TABLE}
     WHERE prediction = 'approved' and docvec_v2 is not null and docvec_v2[2] > 1.5 and docvec_v2[1] < -2.0;"""
         results = []
-        for r in sorted(list(db.query(query)), key=lambda x: x['score'], reverse=True):
+        for r in sorted(list(filter(lambda x: x['score'] > 0.2, db.query(query))), key=lambda x: x['score'], reverse=True):
             # try:
             #     r['docvec'] = list(map(float,r['docvec'][1:-1].split(",")))
             #
