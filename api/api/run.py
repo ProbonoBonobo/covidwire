@@ -23,7 +23,7 @@ cors = CORS(app)
 app.config['CORS_HEADERS'] = 'Content-Type'
 app.config["DEBUG"] = True
 cols = ("approved", "rejected", "international", "local", "regional", "national", "unbound", "state")
-transtable = {"approved": "approved", "rejected": "rejected", "local": "city", "regional": "local", "national": "national", "unbound": "indefinite", "state": "state"}
+transtable = {"approved": "approved", "rejected": "rejected", "local": "city", "regional": "local", "national": "national", "unbound": "indefinite", "state": "state", "international": "international"}
 
 @app.route('/', methods=['GET'])
 def home():
@@ -42,6 +42,7 @@ def get_scored_results():
     kwargs = {"_limit": 50, "p": 0, "fips": "06097", "audience": "local,state"}
     _kwargs = {k: urldecode(v) for k,v in request.args.items()} or {}
     kwargs.update(_kwargs)
+    print(kwargs)
 
     fips = kwargs['fips']
     print(f"fips is : {fips}")
