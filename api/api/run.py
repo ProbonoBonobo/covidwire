@@ -39,7 +39,7 @@ import random
 @app.route('/scored', methods=['GET'])
 def get_scored_results():
     print(f"Cache keys: {list(cache.keys())}")
-    kwargs = {"_limit": 50, "p": 0, "fips": "06097", "audience": ""}
+    kwargs = {"_limit": 50, "p": 0, "fips": "06097", "audience": "local,state"}
     _kwargs = {k: urldecode(v) for k,v in request.args.items()} or {}
     kwargs.update(_kwargs)
 
