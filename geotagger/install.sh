@@ -8,12 +8,15 @@ libncurses5-dev libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev python-o
 mkdir model
 wget "http://www.kevinzeidler.com/$MODEL_FILENAME"
 7za e "$MODEL_FILENAME"
-git clone https://github.com/pyenv/pyenv.git ~/.pyenv
-echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
-echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
-echo -e 'if command -v pyenv 1>/dev/null 2>&1; then\n eval "$(pyenv init -)"\nfi' >> ~/.bashrc
-exec $SHELL || return
-pyenv install $PYTHON_VERSION
+if [ -d "/path/to/dir" ]
+  then
+    git clone https://github.com/pyenv/pyenv.git ~/.pyenv
+    echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
+    echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
+    echo -e 'if command -v pyenv 1>/dev/null 2>&1; then\n eval "$(pyenv init -)"\nfi' >> ~/.bashrc
+    exec $SHELL || return
+    pyenv install $PYTHON_VERSION
+fi
 pyenv local $PYTHON_VERSION
 pip install --upgrade pip
 pip install poetry
