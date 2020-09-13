@@ -9,7 +9,7 @@ import json
 import os
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
-model_path = os.getenv("MODEL_FILEPATH", os.path.join(os.dirname(os.dirname(__file__)), "model/v2"))
+model_path = os.getenv("MODEL_FILEPATH", os.path.join(os.path.dirname(os.path.dirname(__file__)), "model/v2"))
 import ktrain
 predictor = ktrain.load_predictor(model_path)
 pio.renderers.default = "browser"
