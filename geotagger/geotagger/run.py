@@ -17,8 +17,11 @@ import json
 import plotly.io as pio
 from urllib.request import urlopen
 import json
-import plotly.io as pio
-
+import os
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
+import ktrain
+predictor = ktrain.load_predictor('/home/kz/dev/model.bin')
 pio.renderers.default = "browser"
 import re
 import dataset
@@ -187,8 +190,11 @@ for row in shapedb:
     hull = Polygon(coords)
     counties[county] = hull
     county2fips[county] = row["fips"]
-
-gmaps = googlemaps.Client(key=os.environ["GOOGLE_MAPS_API_KEY"])
+for row in db['uscities']:
+    county = f"{row['county_name']} County, {row['state_name']}"
+    fips = row['county_fips']
+    county2fips[county] = fips
+# gmaps = googlemaps.Client(key=os.environ["GOOGLE_MAPS_API_KEY"])
 rows = []
 bias = {}
 
@@ -211,87 +217,87 @@ def diag2poly(p1, p2):
     points = Polygon([p1, [p1[0], p2[1]], p2, [p2[0], p1[1]]])
     return points
 
-
-@cache_queries
-def geocode(*args, **kwargs):
-    globals()["geocode"].__doc__ = gmaps.geocode.__doc__
-    result = gmaps.geocode(sourceloc)
-    return result
-
-
-@cache_queries
-def find_place(*args, **kwargs):
-    globals()["find_place"].__doc__ = gmaps.find_place.__doc__
-    result = gmaps.find_place(*args, **kwargs)
-    return result
-
-
-def get_bounding_box(s, poi=None):
-    match_types = set()
-    """
-    for result in hypdb.find(name=s):
-        match_types.update([m for m in [result['hypernym'],  result['extension']] if m])
-    qualnames = [row['qualname'] for row in hypdb if s in row['qualname']]
-
-    geotypes = ("Settlement", "District", "Community", "Neighborhood", "City", "Capitol", "State", "Country", "Valley", "Mountain")
-    is_geo = len(qualnames) >= 10 or any(t in match_types for t in geotypes)
-    """
-
-    def get_locationbias(sourceloc):
-        response = geocode(sourceloc)
-        lat, lon = list(response[0]["geometry"]["location"].values())
-        querystring = f"point:{lat},{lon}"
-        bias[sourceloc] = querystring
-        return querystring
-
-    location_bias = get_locationbias(poi) if poi else None
-    response = find_place(
-        s,
-        location_bias=location_bias,
-        input_type="textquery",
-        fields=["name", "geometry", "formatted_address"],
-    )
-    if poi and "California" not in poi:
-        response["candidates"] = [
-            candidate
-            for candidate in response["candidates"]
-            if geodesic(my_loc, list(candidate["geometry"]["location"].values())).km
-            > 250
-        ]
-    err = None
-    try:
-        candidate = response["candidates"][0]
-        bb = [
-            list(sorted(list(p.values())))
-            for p in candidate["geometry"]["viewport"].values()
-        ]
-        coords = diag2poly(*bb)
-        poly = Polygon(coords)
-        diameter = geodesic(list(reversed(bb[1])), list(reversed(bb[0]))).kilometers / 2
-
-        centroid = poly.centroid
-        bb = calculate_bounding_box(centroid.coords[0], diameter * 0.38)
-        area = poly.area
-        name = response["candidates"][0]["name"]
-    except Exception as e:
-        print(e.__class__.__name__, e)
-        bb = []
-        coords = []
-        poly = Polygon([[0, 0], [0, 0], [0, 0], [0, 0]])
-        centroid = poly.centroid
-        area = poly.area
-        err = e
-        name = None
-    return {
-        "bias": location_bias,
-        "response": response,
-        "name": name,
-        "bounds": bb,
-        "poly": poly,
-        "centroid": centroid,
-        "area": area,
-        "err": err,
-    }
+#
+# @cache_queries
+# def geocode(*args, **kwargs):
+#     globals()["geocode"].__doc__ = gmaps.geocode.__doc__
+#     result = gmaps.geocode(sourceloc)
+#     return result
+#
+#
+# @cache_queries
+# def find_place(*args, **kwargs):
+#     globals()["find_place"].__doc__ = gmaps.find_place.__doc__
+#     result = gmaps.find_place(*args, **kwargs)
+#     return result
+#
+#
+# def get_bounding_box(s, poi=None):
+#     match_types = set()
+#     """
+#     for result in hypdb.find(name=s):
+#         match_types.update([m for m in [result['hypernym'],  result['extension']] if m])
+#     qualnames = [row['qualname'] for row in hypdb if s in row['qualname']]
+#
+#     geotypes = ("Settlement", "District", "Community", "Neighborhood", "City", "Capitol", "State", "Country", "Valley", "Mountain")
+#     is_geo = len(qualnames) >= 10 or any(t in match_types for t in geotypes)
+#     """
+#
+#     def get_locationbias(sourceloc):
+#         response = geocode(sourceloc)
+#         lat, lon = list(response[0]["geometry"]["location"].values())
+#         querystring = f"point:{lat},{lon}"
+#         bias[sourceloc] = querystring
+#         return querystring
+#
+#     location_bias = get_locationbias(poi) if poi else None
+#     response = find_place(
+#         s,
+#         location_bias=location_bias,
+#         input_type="textquery",
+#         fields=["name", "geometry", "formatted_address"],
+#     )
+#     if poi and "California" not in poi:
+#         response["candidates"] = [
+#             candidate
+#             for candidate in response["candidates"]
+#             if geodesic(my_loc, list(candidate["geometry"]["location"].values())).km
+#             > 250
+#         ]
+#     err = None
+#     try:
+#         candidate = response["candidates"][0]
+#         bb = [
+#             list(sorted(list(p.values())))
+#             for p in candidate["geometry"]["viewport"].values()
+#         ]
+#         coords = diag2poly(*bb)
+#         poly = Polygon(coords)
+#         diameter = geodesic(list(reversed(bb[1])), list(reversed(bb[0]))).kilometers / 2
+#
+#         centroid = poly.centroid
+#         bb = calculate_bounding_box(centroid.coords[0], diameter * 0.38)
+#         area = poly.area
+#         name = response["candidates"][0]["name"]
+#     except Exception as e:
+#         print(e.__class__.__name__, e)
+#         bb = []
+#         coords = []
+#         poly = Polygon([[0, 0], [0, 0], [0, 0], [0, 0]])
+#         centroid = poly.centroid
+#         area = poly.area
+#         err = e
+#         name = None
+#     return {
+#         "bias": location_bias,
+#         "response": response,
+#         "name": name,
+#         "bounds": bb,
+#         "poly": poly,
+#         "centroid": centroid,
+#         "area": area,
+#         "err": err,
+#     }
 
 
 def visualize(df, title, subtitle, center, article_id, content):
@@ -369,141 +375,265 @@ for i, row in enumerate(db["geojson_v4"]):
 batch = []
 queue = list(
     sorted(
-        [row for row in crawldb if row['published_at']],
+        [row for row in db.query("select *, docvec_v2[2] -  docvec_v2[1] as score from articles_v2 where prediction = 'approved' and published_at is not null and scoring_version not like 'v6:%' limit 5000;") if row['published_at'] and row['docvec_v2'] and len(row['docvec_v2']) == 8],
         key=lambda x: x["published_at"],
         reverse=True,
     )
 )
 print(f"{len(queue)} items in queue")
 my_loc = [float(os.getenv("LAT", 32.74)), float(os.getenv("LONG", -117.13))]
+labels = predictor.get_classes()
+import textwrap
+def predict_location(article):
+  #lines = [k.title() + ": " + fix_text(re.sub(r"\s+", " ", v.replace("\n", " "), re.MULTILINE)) +  " " for k,v in article.items()]
+  lines = article.split("\n")
+  stub = article
+  probs = predictor.predict(stub, return_proba=True)
+  srted = [(k, round(v*100,2)) for k,v in sorted(list(zip(labels,probs.tolist())), key=lambda x: x[1], reverse=True)]
+  prediction, confidence = srted[0]
+
+  filtered = {k:v for k,v in filter(lambda x: x[1]>0.5, srted)}
+  colors = [red, yellow, green, blue]
+  for color, line in zip(colors, lines):
+    for wrapped in textwrap.wrap(line):
+      print(color(wrapped))
+  print("="*20, "RANKED PREDICTION", "="*20, "\n")
+  print(json.dumps(filtered, indent=4), end="\n\n" + ("=" * 59) + "\n\n")
+  return {"prediction": prediction, "confidence": confidence, "output": filtered}
+from shapely.ops import cascaded_union
+
+base_scores = {"indefinite": 2, "international": 3, "national": 5, "regional": 8, "state": 13, "city": 21}
+import math
 for row in queue:
-    if not row["ner"]:
-        continue
+    # if not row["ner"]:
+    #     continue
 
+    #
+    # print(row)
+    words = re.findall(r"\b(\S+)\b", row['content'], re.MULTILINE)
+    rejection_pct,approval_pct = row['docvec_v2'][:2]
+    approval_score = (min(row['score'], 5) - abs(4.666666666 - min(row['score'], 5))) * (1/4.666666666 )
 
-    print(row)
-
-    entry = [row["title"], row["description"], row["content"]]
+    approved = approval_pct > rejection_pct
+    preview = ' '.join(words[:min(len(words), 150)])
+    entry = f"""Headline: {row["title"]} \nSource: {row['name']} \nDescription: {row["description"]} \nPreview: {preview}"""
     chunked = "\n".join(map(str, entry))
-    ents = row["ner"]
-    sourceloc = row["loc"]
-    state = row["state"]
-    resolved_entities = {}
-    resolved_names = defaultdict(list)
-    if not ents:
+    tagged = predict_location(entry)
+    prediction = tagged['prediction']
+    confidence = tagged['confidence']
+    outputs = tagged['output']
+    audience = row['audience']
+    high_quality_sources = {"The Atlantic", "Los Angeles Times", "The Washington Post", "The Philadelphia Inquirer", "Reason Magazine", "KPBS, San Diego", "Mother Jones", "The Center for Public Integrity", "The Boston Globe",  "New York Magazine", "New York Times", "Pro Publica", "ProPublica", "Columbia Journalism Review", "The Economist", "Washington Post", "Wired", "The Boston Globe", "Wall Street Journal", "San Francisco Chronicle"}
+    is_high_quality_source = row['name']
+    if not audience:
         continue
-    acc = {k: 0 for k in county2fips.keys()}
-    for ent, weight in ents.items():
-        if ent in query_rewrite_rules:
-            ent = query_rewrite_rules[ent]
 
-        result = Munch(get_bounding_box(ent, sourceloc))
-        resolved_entities[ent] = result.name
-        location_bias = result.bias
-        print(f"Location bias: {location_bias}")
-        origin_coords = [float(x) for x in location_bias.split(":")[-1].split(",")]
-        origin = Point(origin_coords)
-
-        # print(result)
-        # print(result.response)
-        if result.err:
-            print(result.err)
-            continue
-        poly = result.poly if ent not in state_shapes else state_shapes[ent]
-        difference_penalty = pow(
-            jaro_winkler.normalized_similarity(result.name, ent), 3
-        )
-        for county, hull in counties.items():
-
-            if hull.intersects(poly):
-
-                c1 = list(sorted(list(*hull.centroid.coords), reverse=True))
-                c2 = list(sorted(list(*result.centroid.coords), reverse=True))
-
-                distance_from_target = (
-                    1
-                    if hull.contains(poly) or poly.contains(hull) or hull.almost_equals(poly)
-                    else 1 / sqrt((1 + geodesic(c1, c2).km) / 4)
-                )
-                # distance_from_source = origin.distance(hull)
-                distance_penalty = distance_from_target
-
-                size_penalty = pow(1 + result.area, 2) / 6
-                unweighted_score = log(1 + pow(1 + weight, 2), 2)
-                relevance_score = (
-                    sqrt(unweighted_score / size_penalty)
-                    * distance_penalty
-                    * difference_penalty
-                )
-                resolved_names[county].append(f"{ent} ( => {result.name} )")
-
-                #
-                # print(f"County {green(county)} intersects {blue(result.name)} with score: {magenta(relevance_score)}")
-                # print(f"    relevance_score = sqrt(unweighted_score / size_penalty) * distance_penalty * difference_penalty")
-                # print(red(f"    = sqrt({round(unweighted_score)} / {round(size_penalty,8)}) * {distance_penalty} * {difference_penalty}") )
-                # print(yellow(f"    = sqrt({(unweighted_score/size_penalty) * distance_penalty } * {difference_penalty}") )
-                # print(green(f"    = {relevance_score}"))
-                acc[county] += relevance_score
-    acc = {k: v for k, v in acc.items()}
-    local_arr = np.array(list(acc.values()))
-    if local_arr.max() >= 20:
-        scalar_coeff = 20 / local_arr.max()
-        local_arr = local_arr * scalar_coeff
-        acc = dict(zip(acc.keys(), local_arr))
-    # if local_sos > global_sos:
-    #     scalar_ratio = local_sos / global_sos
-    #     print(cyan(f"Rescaling by constant factor of {scalar_ratio} (global mean: {global_sos}; local mean: {local_sos})"))
-    #     acc = dict(zip(acc.keys(), local_arr * scalar_ratio))
+    # if prediction == 'United States':
+    #     fips = ''
+    # elif prediction.lower() in ('international', 'unspecified'):
+    #     fips = prediction
+    #     continue
     # else:
-    #     scalar_ratio = 1
-    # cumsums.append(local_sos)
-    # global_sos = np.array(cumsums).mean()
+    shape=None
+    if prediction in county_shapes:
+        shape = county_shapes[prediction]
+    elif prediction in state_shapes:
+        shape = state_shapes[prediction]
+    elif prediction.startswith("District of Columbia"):
+        states = state_shapes.values()
+        shape = cascaded_union(list(states)).convex_hull
+        print(f"No shape for prediction: {prediction}")
 
-    print(f"=================== Total scores: ====================")
-    print("                 ", cyan(row["title"]), f" ({row['name']}, {row['loc']})")
-    print("                 ", blue(row["description"]))
+    # else:
+    #     print(f"No shape for prediction: {prediction}")
+    #     continue
+    print(green(prediction), blue(shape))
 
-    for line in wrap(row["content"]):
-        print(yellow(line),)
-    ranked = list(sorted(list(acc.items()), key=lambda x: x[1], reverse=True))
+    total_points = base_scores[audience]
+    base = approval_score
+    coeff = min(1.0, confidence / 100 + 0.2)
+    adjusted = base * coeff * total_points
+
+    print(f"{cyan(row['title'])}")
+    print(f"Predicted locale: {magenta(prediction)}")
+    print(f"Predicted audience: {magenta(row['audience'])}")
+    print(f"Original score: {magenta(row['score'])}")
+    print(f"Possible points: {red(total_points)}")
+    print(f"Raw score: {yellow(approval_score)}")
+    print(f"Geoconfidence: {green(confidence / 100)}")
+    print(f"Perplexity penalty: {blue(coeff)}")
+    print(f"Percent of total points awarded: {cyan(base * coeff)}")
+    print(f"New score: {magenta(adjusted)}")
+    # continue
+    acc = {k: 0 for k in county_shapes.keys()}
+    for county, hull in county_shapes.items():
+        if shape:
+            c1 = list(sorted(list(*hull.centroid.coords), reverse=True))
+            c2 = list(sorted(list(*shape.centroid.coords), reverse=True))
+        #
+            distance_from_target = (
+                1
+                if hull.contains(shape) or shape.contains(hull) or hull.almost_equals(shape)
+                else geodesic(c1, c2).km
+            )
+        else:
+            distance_from_target = 9999
+        coreference_score = 0
+        if audience == 'regional':
+            distance_penalty = 1-max(math.sqrt(distance_from_target*0.2)/2,1)
+            coreference_score = adjusted if distance_from_target <= 1 else adjusted * distance_penalty
+        elif audience == 'national':
+            quality = 2 if is_high_quality_source and approval_score > 1 and row['docvec_v2'][6] > 4 else 0.9
+            coreference_score = min(8, adjusted * quality)
+        elif audience == 'city':
+            coreference_score = adjusted if county == prediction else 0
+        elif audience == 'state':
+            my_state = prediction.split(" County, ")[-1]
+            same_state = county.endswith(my_state)
+            coreference_score = adjusted if same_state else 0
+        elif audience == 'international':
+            quality = 1.6 if is_high_quality_source and approval_score > 1 and row['docvec_v2'][3] > 4 else 0.9
+            coreference_score = min(5, adjusted * quality)
+        elif audience == 'indefinite':
+            coreference_score = 0
+        else:
+            coreference_score = 0
+
+        #print(f"County {county} is {distance_from_target}km from {prediction}")
+        # coreference_score = 0 if county not in outputs else adjusted if distance_from_target < 5 else adjusted * (outputs[county ]/ adjusted )
+        acc[county] += coreference_score
+    acc = {k: v for k, v in acc.items()}
+    # print(acc)
+    local_arr = np.array(list(acc.values()))
+
+    # print(f"=================== Total scores: ====================")
+    # print("                 ", cyan(row["title"]), f" ({row['name']}, {row['loc']})")
+    # print("                 ", blue(row["description"]))
+    #
+    # for line in wrap(row["content"]):
+    #     print(yellow(line),)
+    # ranked = list(sorted(list(acc.items()), key=lambda x: x[1], reverse=True))
     # for county, score in sorted(list(acc.items()), key=lambda x: x[1], reverse=True):
     #     if score >= 0.2:
     #
     #         print(
-    #             f"{green(county):<36} :: {blue(score)} {magenta(resolved_names[county])}"
+    #             f"{green(county):<36} :: {blue(score)}"
     #         )
-    row.update({
-            "ner": ents,
-            "scoring_version": "v3:jarowinkler-cubic-rampup-penalty-maxscore-20",
-            "scored": {county2fips[k]: round(v, 4) for k, v in acc.items()},
-            "resolved_entities": resolved_entities,
-        })
+    db['articles_v2'].update({
+            "url": row['url'],
+            "predicted_location_name": prediction,
+            "predicted_location_confidence": confidence,
+            "scoring_version": "v6:ktrain-geoclassifier-smooth-regional-falloff",
+            "scored": {county2fips[k]: v for k, v in acc.items() if k in county2fips},
+        }, ['url'])
 
-    print({k:v for k,v in row['scored'].items() if v > 0})
-    batch.append(row)
-    # for k,v in list(globals().items()):
-    #     print(blue(k), " :: ", magenta(v))
-    # pause = input("Press any key to continue, or :q to quit")
-    # if pause == ':q':
-    #     breakpoint()
 
-    crawldb.update(row, ['url'])
-    if GENERATE_PLOTS:
-        lng, lat = list(counties[ranked[0][0]].centroid.coords)[0]
-        center = {"lat": lat, "lon": lng}
-        struct = pd.DataFrame(
-            [
-                {
-                    "county": k,
-                    "fips": county2fips[k],
-                    "z": v,
-                    "tokens": ", ".join([f"{x}<br>" for x in resolved_names[k]]),
-                }
-                for k, v in acc.items()
-            ]
-        )
-        if max(struct.z) >= 0.2:
-            title = f"[#{row['url']}] {row['title']} ({row['name']}, {row['loc']})"
-            subtitle = {row["description"]}
-            visualize(struct, title, subtitle, center, row["url"], chunked)
-print(len(queue))
+
+
+
+    #
+    #             if hull.intersects(poly):
+#
+#     ents = row["ner"]
+#     sourceloc = row["loc"]
+#     state = row["state"]
+#     resolved_entities = {}
+#     resolved_names = defaultdict(list)
+#     if not ents:
+#         continue
+#     acc = {k: 0 for k in county2fips.keys()}
+#     for ent, weight in ents.items():
+#         if ent in query_rewrite_rules:
+#             ent = query_rewrite_rules[ent]
+#
+#         result = Munch(get_bounding_box(ent, sourceloc))
+#         resolved_entities[ent] = result.name
+#         location_bias = result.bias
+#         print(f"Location bias: {location_bias}")
+#         origin_coords = [float(x) for x in location_bias.split(":")[-1].split(",")]
+#         origin = Point(origin_coords)
+#
+#         # print(result)
+#         # print(result.response)
+#         if result.err:
+#             print(result.err)
+#             continue
+#         poly = result.poly if ent not in state_shapes else state_shapes[ent]
+#         difference_penalty = pow(
+#             jaro_winkler.normalized_similarity(result.name, ent), 3
+#         )
+#         for county, hull in counties.items():
+#
+#             if hull.intersects(poly):
+#
+#                 c1 = list(sorted(list(*hull.centroid.coords), reverse=True))
+#                 c2 = list(sorted(list(*result.centroid.coords), reverse=True))
+#
+#                 distance_from_target = (
+#                     1
+#                     if hull.contains(poly) or poly.contains(hull) or hull.almost_equals(poly)
+#                     else 1 / sqrt((1 + geodesic(c1, c2).km) / 4)
+#                 )
+#                 # distance_from_source = origin.distance(hull)
+#                 distance_penalty = distance_from_target
+#
+#                 size_penalty = pow(1 + result.area, 2) / 6
+#                 unweighted_score = log(1 + pow(1 + weight, 2), 2)
+#                 relevance_score = (
+#                     sqrt(unweighted_score / size_penalty)
+#                     * distance_penalty
+#                     * difference_penalty
+#                 )
+#                 resolved_names[county].append(f"{ent} ( => {result.name} )")
+#
+#                 #
+#                 # print(f"County {green(county)} intersects {blue(result.name)} with score: {magenta(relevance_score)}")
+#                 # print(f"    relevance_score = sqrt(unweighted_score / size_penalty) * distance_penalty * difference_penalty")
+#                 # print(red(f"    = sqrt({round(unweighted_score)} / {round(size_penalty,8)}) * {distance_penalty} * {difference_penalty}") )
+#                 # print(yellow(f"    = sqrt({(unweighted_score/size_penalty) * distance_penalty } * {difference_penalty}") )
+#                 # print(green(f"    = {relevance_score}"))
+#                 acc[county] += relevance_score
+#     acc = {k: v for k, v in acc.items()}
+#     local_arr = np.array(list(acc.values()))
+#     if local_arr.max() >= 20:
+#         scalar_coeff = 20 / local_arr.max()
+#         local_arr = local_arr * scalar_coeff
+#         acc = dict(zip(acc.keys(), local_arr))
+#     # if local_sos > global_sos:
+#     #     scalar_ratio = local_sos / global_sos
+#     #     print(cyan(f"Rescaling by constant factor of {scalar_ratio} (global mean: {global_sos}; local mean: {local_sos})"))
+#     #     acc = dict(zip(acc.keys(), local_arr * scalar_ratio))
+#     # else:
+#     #     scalar_ratio = 1
+#     # cumsums.append(local_sos)
+#     # global_sos = np.array(cumsums).mean()
+
+#
+#     # print({k:v for k,v in row['scored'].items() if v > 0})
+#     batch.append(row)
+#     # for k,v in list(globals().items()):
+#     #     print(blue(k), " :: ", magenta(v))
+#     # pause = input("Press any key to continue, or :q to quit")
+#     # if pause == ':q':
+#     #     breakpoint()
+#
+#     crawldb.update(row, ['url'])
+#     if GENERATE_PLOTS:
+#         lng, lat = list(counties[ranked[0][0]].centroid.coords)[0]
+#         center = {"lat": lat, "lon": lng}
+#         struct = pd.DataFrame(
+#             [
+#                 {
+#                     "county": k,
+#                     "fips": county2fips[k],
+#                     "z": v,
+#                     "tokens": ", ".join([f"{x}<br>" for x in resolved_names[k]]),
+#                 }
+#                 for k, v in acc.items()
+#             ]
+#         )
+#         if max(struct.z) >= 0.2:
+#             title = f"[#{row['url']}] {row['title']} ({row['name']}, {row['loc']})"
+#             subtitle = {row["description"]}
+#             visualize(struct, title, subtitle, center, row["url"], chunked)
+# print(len(queue))
