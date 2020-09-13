@@ -1,27 +1,17 @@
-from textdistance import JaroWinkler
 from shapely.geometry import Polygon, MultiPolygon, Point
-from munch import Munch
-import os
 import numpy as np
 import random
-from gemeinsprache.utils import green, yellow, blue, cyan, red, magenta
-import googlemaps
-from collections import defaultdict
-from math import sqrt, log
-from textwrap import wrap
+
 from geopy.distance import geodesic
-import pandas as pd
-from geopy.distance import geodesic
-from urllib.request import urlopen
-import json
 import plotly.io as pio
 from urllib.request import urlopen
 import json
 import os
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
+model_path = os.getenv("MODEL_FILEPATH", os.path.join(os.dirname(os.dirname(__file__)), "model/v2"))
 import ktrain
-predictor = ktrain.load_predictor('/home/kz/dev/model.bin')
+predictor = ktrain.load_predictor(model_path)
 pio.renderers.default = "browser"
 import re
 import dataset
@@ -340,8 +330,8 @@ def visualize(df, title, subtitle, center, article_id, content):
     # fig.write_html(f"outputs/{article_id}/fig.html")
 
 
-#
-jaro_winkler = JaroWinkler()
+# #
+# jaro_winkler = JaroWinkler()
 
 
 import shapely
