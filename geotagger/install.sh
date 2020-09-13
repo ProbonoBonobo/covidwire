@@ -20,8 +20,9 @@ if [ ! -d "$HOME/.pyenv/versions/$PYTHON_VERSION" ]
   then
     pyenv install $PYTHON_VERSION
 
-    pip install --upgrade pip
+
 fi
+pip install --upgrade pip
 pyenv global $PYTHON_VERSION
 pip install poetry
 poetry run pip install --upgrade pip
