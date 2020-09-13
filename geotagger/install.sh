@@ -16,9 +16,12 @@ if [ ! -d ~/.pyenv ]
     echo -e 'if command -v pyenv 1>/dev/null 2>&1; then\n eval "$(pyenv init -)"\nfi' >> ~/.bashrc
     exec $SHELL || return
 fi
-pyenv install $PYTHON_VERSION
-pyenv local $PYTHON_VERSION
-pip install --upgrade pip
+if [ ! -d "$HOME/.pyenv/versions/$PYTHON_VERSION" ]
+  then
+    pyenv install $PYTHON_VERSION
+    pyenv local $PYTHON_VERSION
+    pip install --upgrade pip
+fi
 pip install poetry
 poetry run pip install --upgrade pip
 poetry update
