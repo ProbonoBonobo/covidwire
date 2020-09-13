@@ -365,7 +365,7 @@ for i, row in enumerate(db["geojson_v4"]):
 batch = []
 queue = list(
     sorted(
-        [row for row in db.query("select *, docvec_v2[2] -  docvec_v2[1] as score from articles_v2 where prediction = 'approved' and published_at is not null and scoring_version not like 'v6:%' limit 5000;") if row['published_at'] and row['docvec_v2'] and len(row['docvec_v2']) == 8],
+        [row for row in db.query("select *, docvec_v2[2] -  docvec_v2[1] as score from articles_v2 where prediction = 'approved' and published_at is not null order by published_at desc limit 5000;") if row['published_at'] and row['docvec_v2'] and len(row['docvec_v2']) == 8 and row['scoring_version'] and row['scoring_version'].startswith("v6")],
         key=lambda x: x["published_at"],
         reverse=True,
     )
