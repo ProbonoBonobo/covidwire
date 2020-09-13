@@ -8,7 +8,7 @@ libncurses5-dev libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev python-o
 mkdir model
 wget "http://www.kevinzeidler.com/$MODEL_FILENAME"
 7za e "$MODEL_FILENAME"
-if [ -d "/path/to/dir" ]
+if [ ! -d ~/.pyenv ]
   then
     git clone https://github.com/pyenv/pyenv.git ~/.pyenv
     echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
