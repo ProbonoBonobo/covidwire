@@ -27,7 +27,7 @@ audience_labels = [
     "indefinite",
     "state",
 ]
-LIMIT = os.getenv("SPIDER_LIMIT", 2000)
+LIMIT = os.getenv("SPIDER_LIMIT", 5000)
 MAX_REQUESTS = os.getenv("MAX_REQUESTS", 50)
 
 
@@ -39,7 +39,7 @@ relevance_classifier = ClassificationModel(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "lib/classification_model/v1.0",
     ),
-    use_cuda=int(torch.cuda.is_available()),
+    use_cuda=0*int(torch.cuda.is_available()),
 )
 audience_classifier = ClassificationModel(
     "roberta",
@@ -48,19 +48,20 @@ audience_classifier = ClassificationModel(
         "lib/audience_classifier/v1.0",
     ),
     num_labels=len(audience_labels),
-    use_cuda=int(torch.cuda.is_available())
+    use_cuda=0 * int(torch.cuda.is_available())
 )
 
 UniversalSelector = DotDict(
     {
         "content": "div[class*='-content'] > p, div[class*='content-'] > p, section > p, div[class*='body'] > p, div[class*='article'] > p, div[itemprop*='article'] > p, div[class*='text'] > p, section div[class*='inner'] > p, #article-content p, div[class*='article-body'] p, div[class*='premium'] p, div[class*='story'] p, article.story-body p, div.body-text, article > p, article p, .postBody p, div[class*='main-content'] p, .inner p, #content p, .postBody",
         "title": "//meta[@name='twitter:title' or @property='og:title' or @name='title']/@content",
-        "published_at": "//meta[contains(@property, 'article:published_time') or contains(@name, 'parsely-pub-date') or contains(@property, 'datePublished') or contains(@property, 'parsely-pub-date') or @property='tncms-access-version' or contains(@property,'pubDate') or contains(@itemprop, 'date') or contains(@name, 'ublished') or contains(@property, 'article_date') or contains(@property, 'sailthru.date') or contains(@property, 'article:publishedtoweb') or @name='date' or @name='last_updated_date']/@content | //time/text() | //*[contains(@class, 'time') or contains(@id, 'time') or contains(@aria-label, 'a.m') or contains(@aria-label, 'p.m.') or contains(@aria-label, '2020')]/text() | //time/@datetime | //time/text()",
+        "published_at": "//meta[contains(@property, 'article:published_time') or contains(@name, 'parsely-pub-date') or contains(@property, 'datePublished') or contains(@property, 'parsely-pub-date') or @property='tncms-access-version' or contains(@property,'pubDate') or contains(@itemprop, 'date') or contains(@name, 'ublished') or contains(@property, 'article_date') or contains(@property, 'sailthru.date') or contains(@property, 'article:publishedtoweb') or @name='date' or @name='last_updated_date']/@content | //time/text() | //*[contains(@class, 'time') or contains(@id, 'time') or contains(@aria-label, 'a.m') or contains(@aria-label, 'p.m.') or contains(@aria-label, '2020')]/text() | //time/@datetime | //time/text() | //*[@id='story-info']/small/text()",
         "summary": "//meta[@property='og:description' or @name='twitter:description' or contains(@property,'description') or contains(@name,'description')]/@content",
         "author": "//meta[contains(@property, 'author') or contains(@name, 'author') or @property='byline' or @property='article_author' or @property='og:sitename' or @name='twitter:site']/@content",
         "image_url": "//meta[@property='og:image' or @name='twitter:image' or contains(@property, 'thumbnail') or contains(@name, 'thumbnail')]/@content",
         "section": "//meta[@property='og:section' or @property='parsely-section' or contains(@name, 'section') or @property='article:section' or contains(@property, 'section')]/@content",
-        "keywords": "//meta[@property='article:tag' or @name='parsely-tags' or contains(@name, 'keyword') or contains(@name, 'tag') or contains(@property, 'keyword') or contains(@name, 'tag')]/@content"
+        "keywords": "//meta[@property='article:tag' or @name='parsely-tags' or contains(@name, 'keyword') or contains(@name, 'tag') or contains(@property, 'keyword') or contains(@name, 'tag')]/@content",
+        "name": "//meta[@property='og:site_name' or @name='application-name']/@content"
     }
 )
 
@@ -126,7 +127,11 @@ class Article:
     @property
     def published_at(self):
         date = NULL_DATE
-        if "lastmod" in self.sitemap_data and self.sitemap_data["lastmod"]:
+
+        def dt_specificity(dt):
+            return sum(1 if date.__getattribute__(k) else 0 for k in ('month', 'day', 'hour', 'minute', 'second', 'microsecond', 'tzinfo'))
+
+        if "lastmod" in self.sitemap_data and self.sitemap_data["lastmod"] and (datetime.datetime.now() - self.sitemap_data['lastmod']) < datetime.timedelta(days=365*10):
             date = self.sitemap_data["lastmod"]
         else:
             # print(f"Guessing date for {self.url}...")
@@ -138,13 +143,24 @@ class Article:
             #     print(
             #         f"No date extracted. Attempting to find a date in the metadata..."
             #     )
+                most_specific = None
+                curr_specificity = 0
+                seen = set()
                 for match in self.lxml.xpath(UniversalSelector.published_at):
+                    if match in seen:
+                        continue
+                    seen.add(match)
                     try:
-                        date = parse_timestamp(str(match.text))
+                        date = parse_timestamp(str(re.sub(r"\n", " ", match.strip())))
                         print(f"Found a date! {date}")
-                        break
+                        specificity = dt_specificity(date)
+                        if specificity > curr_specificity :
+                            most_specific = date
+                            curr_specificity = specificity
                     except:
                         pass
+                if most_specific:
+                    date = most_specific
         try:
             date = date.replace(tzinfo=None)
         except:
@@ -285,10 +301,11 @@ if __name__ == "__main__":
     seen = set()
     seen.update([row["url"] for row in good_urls])
     seen.update([row["url"] for row in bad_urls])
+    seen.update([row['url'] for row in db.query("select url from articles a;")])
     print(f"Loaded {len(list(seen))} seen urls.")
     rows = {
         row["url"]: row
-        for row in db.query(f"select * from spiderqueue order by lastmod desc;")
+        for row in db.query(f"select * from spiderqueue where lastmod is not null order by lastmod desc limit 5000;")
         if row["url"] not in seen
     }
     print(f"Found {len(list(rows))} uncrawled urls...")
